@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Система бюджетирования и финансового контроля для онлайн-школы</title>
+<style>
+:root{
+  --bg:#0b0d10; --panel:#12161b; --panel2:#171c22; --line:#26303a; --text:#f3f5f7;
+  --muted:#9aa6b2; --accent:#7c5cff; --accent2:#46c2ff; --good:#36c98f; --warn:#f1b84b; --bad:#ef6461;
+  --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.22);
+}
+body[data-theme="light"]{
+  --bg:#f5f7fb; --panel:#ffffff; --panel2:#f3f6fa; --line:#dbe3ee; --text:#17212b;
+  --muted:#627182; --accent:#6a52ff; --accent2:#2e9cf0; --good:#1f9d68; --warn:#b58317; --bad:#d34b48;
+  --shadow:0 10px 24px rgba(17,24,39,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);
+  transition:background .2s ease,color .2s ease;
+}
+button,select{font:inherit}
+button{cursor:pointer}
+.header{
+  position:sticky;top:0;z-index:10;
+  backdrop-filter: blur(12px);
+  background:rgba(11,13,16,.92);
+  border-bottom:1px solid var(--line);
+  transition:background .2s ease,border-color .2s ease;
+}
+body[data-theme="light"] .header{background:rgba(245,247,251,.94)}
+.wrap{max-width:1440px;margin:0 auto;padding:18px 22px}
+.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.brand h1{margin:0;font-size:28px;line-height:1.1}
+.brand small{display:block;margin-top:6px;color:var(--muted);font-size:13px;line-height:1.45}
+.right-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.filters{display:flex;gap:10px;flex-wrap:wrap}
+select,.theme-toggle{
+  background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px;min-width:160px;
+}
+.theme-toggle{min-width:auto;display:inline-flex;gap:8px;align-items:center}
+.demo-badge{
+  border:1px solid rgba(124,92,255,.35);background:rgba(124,92,255,.12);
+  color:#cfc6ff;padding:7px 10px;border-radius:999px;font-size:12px;
+}
+body[data-theme="light"] .demo-badge{
+  background:#f0ecff;color:#5d47db;border-color:#cabfff;
+}
+.nav{display:flex;gap:8px;overflow:visible;padding-top:14px;flex-wrap:wrap}
+.nav button{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  padding:10px 14px;border-radius:999px
+}
+.nav button.active{
+  background:var(--panel);color:var(--text);border-color:rgba(124,92,255,.45);
+  box-shadow:0 0 0 1px rgba(124,92,255,.15) inset;
+}
+.main{padding:18px 22px 28px;max-width:1440px;margin:0 auto}
+.tab{display:none}
+.tab.active{display:block}
+.case-box{
+  background:linear-gradient(180deg, rgba(124,92,255,.12), rgba(70,194,255,.06));
+  border:1px solid rgba(124,92,255,.24);
+  border-radius:20px;padding:18px 18px;box-shadow:var(--shadow)
+}
+.case-box h2{margin:0 0 8px;font-size:20px}
+.case-box p{margin:0;color:var(--muted);line-height:1.55}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(8,minmax(150px,1fr));margin-top:14px}
+.kpis-4{grid-template-columns:repeat(4,minmax(180px,1fr))}
+.row2{grid-template-columns:1fr 1fr;margin-top:14px}
+.row3{grid-template-columns:1.15fr .85fr .85fr;margin-top:14px}
+.card{
+  background:var(--panel);border:1px solid rgba(38,48,58,.9);border-radius:var(--radius);
+  padding:16px;display:flex;flex-direction:column;height:100%;box-shadow:var(--shadow);
+  transition:background .2s ease,border-color .2s ease
+}
+.section-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:14px}
+.section-title h2{margin:0;font-size:15px}
+.section-title span{font-size:12px;color:var(--muted)}
+.card.kpi{display:grid;grid-template-rows:minmax(36px,auto) minmax(56px,1fr) auto;min-height:188px;align-items:start}
+.kpi .label{color:var(--muted);font-size:12px;line-height:1.35;min-height:36px;display:flex;align-items:flex-start}
+.card.kpi .value{display:block;min-width:0;overflow:visible;padding-top:2px;max-width:100%}
+.kpi .value{font-size:clamp(16px,1.7vw,22px);font-weight:800;margin:0;white-space:normal;line-height:1.08;align-self:flex-start;max-width:100%}
+.delta{font-size:12px;line-height:1.4;margin-top:auto;padding-top:10px}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.metric-list{display:flex;flex-direction:column;gap:0}
+.metric-line{
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:11px 0;border-bottom:1px solid rgba(38,48,58,.55)
+}
+.metric-line:last-child{border-bottom:0}
+.metric-line span{color:var(--muted);font-size:13px}
+.metric-line b{font-size:13px}
+.chart{
+  height:280px;display:flex;align-items:end;gap:10px;padding:14px 6px 4px;
+  border-radius:14px;background:var(--panel2);border:1px solid var(--line)
+}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%}
+.bar{
+  width:100%;max-width:56px;border-radius:10px 10px 4px 4px;
+  background:linear-gradient(180deg,var(--accent2),var(--accent));
+  min-height:8px
+}
+.bar.alt{background:linear-gradient(180deg,#6e7783,#414a54)}
+.bar-label{font-size:11px;color:var(--muted);text-align:center}
+.waterfall{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:280px;padding-top:10px}
+.wf-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.wf-bar{width:76%;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--accent2),var(--accent))}
+.wf-bar.alt{background:linear-gradient(180deg,#68727e,#424a55)}
+.wf-label{font-size:11px;color:var(--muted);margin-top:8px;text-align:center;line-height:1.3}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.table-wrap{overflow:auto;border-radius:12px}
+th,td{
+  padding:12px 12px;border-bottom:1px solid rgba(38,48,58,.55);
+  text-align:right;white-space:nowrap;vertical-align:middle
+}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:rgba(255,255,255,.015)}
+body[data-theme="light"] tbody tr:hover td{background:rgba(23,33,43,.03)}
+th{color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.02em}
+th:first-child,td:first-child{text-align:left;padding-left:14px}
+th:last-child,td:last-child{padding-right:14px}
+.signal{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(38,48,58,.55);align-items:flex-start}
+.signal:last-child{border-bottom:0}
+.icon{
+  width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;
+  background:rgba(124,92,255,.14);color:#cbbfff;font-weight:700;font-size:13px
+}
+body[data-theme="light"] .icon{background:#f0ecff;color:#5d47db}
+.signal b{font-size:13px}
+.signal p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.pill{
+  padding:4px 8px;border-radius:999px;font-size:11px;border:1px solid rgba(38,48,58,.8)
+}
+.pill.good{background:rgba(54,201,143,.12);color:var(--good)}
+.pill.warn{background:rgba(241,184,75,.12);color:var(--warn)}
+.pill.bad{background:rgba(239,100,97,.12);color:var(--bad)}
+body[data-theme="light"] .pill.good{background:#e8f7ef}
+body[data-theme="light"] .pill.warn{background:#fff6df}
+body[data-theme="light"] .pill.bad{background:#fdeeee}
+.progress{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+.progress span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+body[data-theme="light"] .progress{background:#e8edf3}
+.case-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.case-point{
+  background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px
+}
+.case-point b{display:block;font-size:13px;margin-bottom:6px}
+.case-point span{color:var(--muted);font-size:12px;line-height:1.45}
+.footer-note{margin-top:16px;font-size:12px;color:var(--muted)}
+body[data-theme="light"] .case-box{background:linear-gradient(180deg,#ffffff,#f3f6f9);border-color:var(--line)}
+body[data-theme="light"] .case-box h2{color:var(--text)}
+body[data-theme="light"] .case-box p{color:var(--muted)}
+body[data-theme="light"] .case-point{background:#ffffff;border-color:var(--line)}
+
+.model-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.model-control{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.model-control-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+.model-control-head label{font-size:12px;color:var(--muted);line-height:1.35}
+.model-number{
+  width:118px;min-width:0;background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:9px;padding:8px 9px;text-align:right;font-weight:700
+}
+.model-range{width:100%;accent-color:var(--accent)}
+.model-scale{display:flex;justify-content:space-between;gap:8px;margin-top:5px;font-size:10px;color:var(--muted)}
+.model-results{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.model-result{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.model-result span{display:block;color:var(--muted);font-size:11px;line-height:1.35;margin-bottom:7px}
+.model-result b{display:block;font-size:20px;line-height:1.1;overflow-wrap:anywhere}
+.model-hint{margin-top:10px;color:var(--muted);font-size:11px;line-height:1.45}
+@media(max-width:820px){
+  .model-controls{grid-template-columns:1fr}
+  .model-results{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+
+.fin-waterfall{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(54px,1fr));
+  gap:8px;
+  align-items:end;
+  height:190px;
+  padding:12px 4px 2px;
+  margin-top:14px;
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+.fin-wf-item{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+  height:100%;
+  min-width:0;
+}
+.fin-wf-val{
+  font-size:10px;
+  font-weight:700;
+  margin-bottom:5px;
+  text-align:center;
+  white-space:nowrap;
+}
+.fin-wf-track{
+  width:70%;
+  min-width:20px;
+  height:128px;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+}
+.fin-wf-bar{
+  width:100%;
+  border-radius:7px 7px 3px 3px;
+  background:linear-gradient(180deg,var(--accent2),var(--accent));
+  min-height:5px;
+}
+.fin-wf-bar.negative{
+  background:linear-gradient(180deg,#e98683,var(--bad));
+}
+.fin-wf-bar.neutral{
+  background:linear-gradient(180deg,#8a949f,#5d6670);
+}
+.fin-wf-label{
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.2;
+  text-align:center;
+  margin-top:6px;
+  min-height:24px;
+  overflow-wrap:anywhere;
+}
+@media(max-width:820px){
+  .fin-waterfall{overflow-x:auto;grid-template-columns:repeat(6,minmax(72px,1fr))}
+}
+
+
+.payment-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:84px;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.15;
+  border:1px solid transparent;
+}
+.priority-critical{background:rgba(239,100,97,.14);color:var(--bad);border-color:rgba(239,100,97,.28)}
+.priority-high{background:rgba(241,184,75,.14);color:var(--warn);border-color:rgba(241,184,75,.30)}
+.priority-medium{background:rgba(70,194,255,.12);color:var(--accent2);border-color:rgba(70,194,255,.25)}
+.status-pay{background:rgba(239,100,97,.10);color:var(--bad);border-color:rgba(239,100,97,.22)}
+.status-confirmed{background:rgba(54,201,143,.12);color:var(--good);border-color:rgba(54,201,143,.24)}
+.status-schedule{background:rgba(124,92,255,.12);color:#cbbfff;border-color:rgba(124,92,255,.26)}
+.status-work{background:rgba(70,194,255,.12);color:var(--accent2);border-color:rgba(70,194,255,.24)}
+body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;border-color:#cabfff}
+
+@media(max-width:1260px){
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .kpis-4{grid-template-columns:repeat(4,1fr)}
+  .row3,.row2,.case-grid{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  .wrap,.main{padding-left:14px;padding-right:14px}
+  .top{flex-direction:column;align-items:stretch}
+  .right-tools{justify-content:flex-start}
+  .kpis,.kpis-4{grid-template-columns:repeat(2,1fr)}
+  .chart,.waterfall{height:230px}
+}
+</style>
+</head>
+<body data-theme="dark">
+<header class="header">
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <h1>Система бюджетирования и финансового контроля для онлайн-школы</h1>
+        <small>Управленческий учет · бюджетирование · скользящий прогноз · ОПиУ · ДДС · баланс · казначейство</small>
+      </div>
+      <div class="right-tools">
+        <span class="demo-badge" id="badge">ДЕМО · синтетические данные</span>
+        <div class="filters">
+          <select id="period">
+            <option>Сентябрь 2026</option>
+            <option>3 квартал 2026</option>
+            <option>2026 YTD</option>
+          </select>
+          <select id="scenario">
+            <option>Базовый сценарий</option>
+            <option>Оптимистичный сценарий</option>
+            <option>Консервативный сценарий</option>
+          </select>
+          <select id="segment">
+            <option>ГК</option>
+            <option>Основные курсы</option>
+            <option>Премиум-программы</option>
+            <option>Дополнительные продукты</option>
+          </select>
+          <select id="unit">
+            <option>Все подразделения</option>
+            <option>Маркетинг</option>
+            <option>Продажи</option>
+            <option>Продукт</option>
+            <option>Административный блок</option>
+          </select>
+        </div>
+        <button class="theme-toggle" id="themeToggle" type="button"><span id="themeIcon">☀️</span><span id="themeLabel">Светлая тема</span></button>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="active" data-tab="overview">Панель руководителя</button>
+      <button data-tab="budget">Бюджет и план-факт</button>
+      <button data-tab="forecast">Скользящий прогноз</button>
+      <button data-tab="statements">ОПиУ · ДДС · Баланс</button>
+      <button data-tab="drivers">Финмодель и метрики</button>
+      <button data-tab="treasury">Казначейство</button>
+      <button data-tab="quality">Контроль данных</button>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <section id="overview" class="tab active">
+    <div class="case-box">
+      <h2>Система бюджетирования и финансового контроля</h2>
+      <p>Прототип показывает, как может выглядеть единый управленческий контур онлайн-школы: от бюджетной модели и скользящего прогноза до ОПиУ, ДДС, управленческого баланса, дерева метрик и казначейства.</p>
+    </div>
+
+    <div class="grid kpis">
+      <div class="card kpi"><div class="label">Выручка за период</div><div class="value" data-bind="rev"></div><div class="delta good">+14,2% к прошлому периоду</div></div>
+      <div class="card kpi"><div class="label">Операционная прибыль (EBITDA)</div><div class="value" data-bind="ebitda"></div><div class="delta" data-bind="ebitdaMargin"></div></div>
+      <div class="card kpi"><div class="label">Операционный денежный поток</div><div class="value" data-bind="ocf"></div><div class="delta good">положительный поток</div></div>
+      <div class="card kpi"><div class="label">Исполнение бюджета</div><div class="value" data-bind="budgetExec"></div><div class="delta" data-bind="budgetExecDelta"></div></div>
+      <div class="card kpi"><div class="label">Прогноз года</div><div class="value" data-bind="yearForecast"></div><div class="delta good">выше плана</div></div>
+      <div class="card kpi"><div class="label">Средний чек</div><div class="value" data-bind="avgCheck"></div><div class="delta good">рост по сравнению с прошлым периодом</div></div>
+      <div class="card kpi"><div class="label">Конверсия в оплату</div><div class="value" data-bind="conversion"></div><div class="delta">по воронке продаж</div></div>
+      <div class="card kpi"><div class="label">Свободные денежные средства</div><div class="value" data-bind="freeCash"></div><div class="delta good">доступны к размещению</div></div>
+    </div>
+
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>Выручка по месяцам</h2><span data-bind="overviewScope"></span></div>
+        <div class="chart" id="revenueChart"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Ключевые сигналы</h2><span>фокус руководителя</span></div>
+        <div id="overviewSignals"></div>
+      </div>
+    </div>
+
+    <div class="grid row3">
+      <div class="card">
+        <div class="section-title"><h2>Исполнение бюджета по блокам</h2><span>план · факт · отклонение</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Блок</th><th>План</th><th>Факт</th><th>Отклонение</th><th>Статус</th></tr></thead>
+            <tbody id="budgetSummaryBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Состояние управленческого контура</h2><span>дисциплина</span></div>
+        <div class="metric-list">
+          <div class="metric-line"><span>Бюджетный календарь</span><b class="good">98%</b></div>
+          <div class="metric-line"><span>Закрытие управленческого месяца</span><b class="good">T+4</b></div>
+          <div class="metric-line"><span>Формы отчетности утверждены</span><b class="good">100%</b></div>
+          <div class="metric-line"><span>Факторный анализ отклонений</span><b class="good">ежемесячно</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Задачи</h2><span>приоритет</span></div>
+        <div class="signal"><div class="icon">1</div><div><b>Финансовая модель с CFO</b><p>Собрать единую модель драйверов роста, бюджета и прогноза.</p></div></div>
+        <div class="signal"><div class="icon">2</div><div><b>Управленческий учет</b><p>Настроить структуру форм, аналитик и регламент закрытия периода.</p></div></div>
+        <div class="signal"><div class="icon">3</div><div><b>Улучшение бюджетирования</b><p>Сделать бюджет прозрачным, регулярным и пригодным для решений.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="budget" class="tab">
+    <div class="grid kpis kpis-4">
+      <div class="card kpi"><div class="label">Бюджет выручки</div><div class="value" data-bind="budgetRevenue"></div></div>
+      <div class="card kpi"><div class="label">Факт выручки</div><div class="value" data-bind="actualRevenue"></div></div>
+      <div class="card kpi"><div class="label">Отклонение</div><div class="value" data-bind="budgetVariance"></div></div>
+      <div class="card kpi"><div class="label">Исполнение</div><div class="value" data-bind="budgetExec"></div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>План-факт по основным статьям</h2><span>бюджетирование</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статья</th><th>План</th><th>Факт</th><th>Отклонение</th><th>%</th></tr></thead>
+            <tbody id="planFactBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Факторный анализ отклонений</h2><span>цена · объем · конверсия · расходы</span></div>
+        <div class="waterfall" id="varianceWaterfall"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="forecast" class="tab">
+    <div class="grid kpis kpis-4">
+      <div class="card kpi"><div class="label">Годовой план</div><div class="value" data-bind="planYear"></div></div>
+      <div class="card kpi"><div class="label">Скользящий прогноз</div><div class="value" data-bind="yearForecast"></div></div>
+      <div class="card kpi"><div class="label">До выполнения плана</div><div class="value" data-bind="toPlan"></div></div>
+      <div class="card kpi"><div class="label">Вероятность выполнения</div><div class="value" data-bind="planProbability"></div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>Скользящий прогноз по месяцам</h2><span>факт и прогноз</span></div>
+        <div class="chart" id="forecastChart"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Сценарии</h2><span>год к закрытию</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Сценарий</th><th>Выручка</th><th>Операционная прибыль</th><th>Денежный поток</th><th>Комментарий</th></tr></thead>
+            <tbody id="scenarioBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="statements" class="tab">
+    <div class="grid row3">
+      <div class="card">
+        <div class="section-title"><h2>ОПиУ</h2><span>управленческая прибыль</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статья</th><th>Сумма</th><th>% от выручки</th></tr></thead>
+            <tbody id="plBody"></tbody>
+          </table>
+        </div>
+        <div class="fin-waterfall" id="plWaterfall" aria-label="Водопад ОПиУ"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>ДДС</h2><span>операционный контур</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статья</th><th>Сумма</th><th>Тип</th></tr></thead>
+            <tbody id="cfBody"></tbody>
+          </table>
+        </div>
+        <div class="fin-waterfall" id="cfWaterfall" aria-label="Водопад ДДС"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Управленческий баланс</h2><span>структура</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статья</th><th>Сумма</th><th>Доля</th></tr></thead>
+            <tbody id="balBody"></tbody>
+          </table>
+        </div>
+        <div class="fin-waterfall" id="balWaterfall" aria-label="Водопад управленческого баланса"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="drivers" class="tab">
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>Дерево финансовых метрик</h2><span>логика модели</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Уровень</th><th>Метрика</th><th>Текущее значение</th><th>Влияние на выручку/прибыль</th></tr></thead>
+            <tbody id="driversBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Интерактивная финансовая модель</h2><span>изменяйте драйверы вручную</span></div>
+
+        <div class="model-controls">
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmLeads">Лиды, чел.</label>
+              <input class="model-number" id="fmLeads" type="number" min="1000" max="2000000" step="1000">
+            </div>
+            <input class="model-range" id="fmLeadsRange" type="range" min="1000" max="2000000" step="1000">
+            <div class="model-scale"><span>1 тыс.</span><span>2 млн</span></div>
+          </div>
+
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmConversion">Конверсия лид → оплата, %</label>
+              <input class="model-number" id="fmConversion" type="number" min="1" max="30" step="0.1">
+            </div>
+            <input class="model-range" id="fmConversionRange" type="range" min="1" max="30" step="0.1">
+            <div class="model-scale"><span>1%</span><span>30%</span></div>
+          </div>
+
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmAvgCheck">Средний чек, тыс. ₽</label>
+              <input class="model-number" id="fmAvgCheck" type="number" min="1" max="100" step="0.1">
+            </div>
+            <input class="model-range" id="fmAvgCheckRange" type="range" min="1" max="100" step="0.1">
+            <div class="model-scale"><span>1 тыс. ₽</span><span>100 тыс. ₽</span></div>
+          </div>
+
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmMarketing">Маркетинг / выручка, %</label>
+              <input class="model-number" id="fmMarketing" type="number" min="0" max="60" step="0.1">
+            </div>
+            <input class="model-range" id="fmMarketingRange" type="range" min="0" max="60" step="0.1">
+            <div class="model-scale"><span>0%</span><span>60%</span></div>
+          </div>
+
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmPayroll">ФОТ / выручка, %</label>
+              <input class="model-number" id="fmPayroll" type="number" min="0" max="60" step="0.1">
+            </div>
+            <input class="model-range" id="fmPayrollRange" type="range" min="0" max="60" step="0.1">
+            <div class="model-scale"><span>0%</span><span>60%</span></div>
+          </div>
+
+          <div class="model-control">
+            <div class="model-control-head">
+              <label for="fmOtherCosts">Прочие операционные расходы / выручка, %</label>
+              <input class="model-number" id="fmOtherCosts" type="number" min="0" max="50" step="0.1">
+            </div>
+            <input class="model-range" id="fmOtherCostsRange" type="range" min="0" max="50" step="0.1">
+            <div class="model-scale"><span>0%</span><span>50%</span></div>
+          </div>
+        </div>
+
+        <div class="model-results" aria-live="polite">
+          <div class="model-result"><span>Количество оплат</span><b id="fmPaymentsResult">0</b></div>
+          <div class="model-result"><span>Выручка</span><b id="fmRevenueResult">0</b></div>
+          <div class="model-result"><span>Операционная прибыль</span><b id="fmEbitdaResult">0</b></div>
+          <div class="model-result"><span>Операционная рентабельность</span><b id="fmMarginResult">0%</b></div>
+        </div>
+        <div class="model-hint">Расчет: лиды × конверсия = оплаты; оплаты × средний чек = выручка; операционная прибыль = выручка минус маркетинг, ФОТ и прочие операционные расходы.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="treasury" class="tab">
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>Денежный прогноз на 8 недель</h2><span>ликвидность</span></div>
+        <div class="chart" id="cashChart"></div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Казначейство</h2><span>свободные деньги и размещение</span></div>
+        <div class="metric-list">
+          <div class="metric-line"><span>Свободный остаток</span><b data-bind="freeCash"></b></div>
+          <div class="metric-line"><span>Резервный фонд</span><b data-bind="reserveFund"></b></div>
+          <div class="metric-line"><span>Сумма к размещению</span><b class="good" data-bind="toPlacement"></b></div>
+          <div class="metric-line"><span>Ожидаемый доход от размещения</span><b class="good" data-bind="placementIncome"></b></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid row2">
+      <div class="card">
+        <div class="section-title"><h2>Платежный календарь</h2><span>текущая неделя</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Статья</th><th>Сумма</th><th>Приоритет</th><th>Статус</th></tr></thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title"><h2>Риски ликвидности</h2><span>наблюдение</span></div>
+        <div id="treasurySignals"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quality" class="tab">
+    <div class="case-box">
+      <h2>Контроль качества данных и автоматизации</h2>
+      <p>Система должна соединять бюджет, факт, прогноз и управленческую аналитику в одной модели: учетные системы, платежные данные и управленческие формы.</p>
+      <div class="case-grid">
+        <div class="case-point"><b>ОПиУ ↔ учетная система</b><span>сверка логики управленческого учета и аналитик.</span></div>
+        <div class="case-point"><b>ДДС ↔ банк</b><span>контроль движения денег и остатков.</span></div>
+        <div class="case-point"><b>Бюджет ↔ факт</b><span>регулярный план-факт и прозрачные причины отклонений.</span></div>
+        <div class="case-point"><b>Скользящий прогноз</b><span>пересчет годового прогноза на основе факта и драйверов.</span></div>
+        <div class="case-point"><b>Дерево метрик</b><span>единая логика показателей для бизнеса и финансов.</span></div>
+        <div class="case-point"><b>Бюджетный календарь</b><span>соблюдение дедлайнов и единый процесс согласования.</span></div>
+      </div>
+      <div class="footer-note">Прототип построен на синтетических данных и показывает подход к проектированию управленческой системы под задачи бюджетирования, финансового контроля и анализа.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const tabs=document.querySelectorAll('.nav button');
+tabs.forEach(btn=>btn.addEventListener('click',()=>{
+  tabs.forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+}));
+const themeToggle=document.getElementById('themeToggle');
+const themeLabel=document.getElementById('themeLabel');
+const themeIcon=document.getElementById('themeIcon');
+function applyTheme(theme){
+  document.body.setAttribute('data-theme', theme);
+  if(theme==='light'){themeLabel.textContent='Тёмная тема'; themeIcon.textContent='🌙';}
+  else {themeLabel.textContent='Светлая тема'; themeIcon.textContent='☀️';}
+  try{localStorage.setItem('umschool_demo_theme', theme)}catch(e){}
+}
+let savedTheme='dark';
+try{savedTheme=localStorage.getItem('umschool_demo_theme') || 'dark'}catch(e){}
+applyTheme(savedTheme);
+themeToggle.addEventListener('click',()=>{
+  const next=document.body.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+  applyTheme(next);
+});
+function fmtMoney(n,d=1){return `${n.toFixed(d).replace('.',',')} млн ₽`;}
+function fmtPct(n,d=1){return `${n.toFixed(d).replace('.',',')}%`;}
+function fmtNum(n){return Math.round(n).toLocaleString('ru-RU');}
+function bindText(k,v){document.querySelectorAll(`[data-bind="${k}"]`).forEach(el=>el.textContent=v);}
+function pill(t,c){return `<span class="pill ${c}">${t}</span>`}
+const baseData = {
+  'Сентябрь 2026': {rev:188, margin:24, ocf:36, avgCheck:18.4, conv:9.8, leads:104000, budgetExec:102.6, freeCash:68, yPlan:2100, yForecast:2148},
+  '3 квартал 2026': {rev:538, margin:23, ocf:92, avgCheck:18.1, conv:9.4, leads:298000, budgetExec:101.2, freeCash:74, yPlan:2100, yForecast:2134},
+  '2026 YTD': {rev:1615, margin:22, ocf:244, avgCheck:17.9, conv:9.1, leads:912000, budgetExec:100.8, freeCash:82, yPlan:2100, yForecast:2162}
+};
+const scenarioFactor = {
+  'Базовый сценарий': {rev:1, margin:1, ocf:1, forecast:1, prob:78},
+  'Оптимистичный сценарий': {rev:1.06, margin:1.08, ocf:1.10, forecast:1.07, prob:88},
+  'Консервативный сценарий': {rev:0.95, margin:0.93, ocf:0.90, forecast:0.95, prob:64}
+};
+const segmentFactor = {'ГК':1, 'Основные курсы':0.42, 'Премиум-программы':0.36, 'Дополнительные продукты':0.22};
+const unitFactor = {'Все подразделения':1, 'Маркетинг':0.22, 'Продажи':0.18, 'Продукт':0.27, 'Административный блок':0.12};
+function getState(){
+  const period=document.getElementById('period').value;
+  const scenario=document.getElementById('scenario').value;
+  const segment=document.getElementById('segment').value;
+  const unit=document.getElementById('unit').value;
+  const b=baseData[period], sc=scenarioFactor[scenario];
+  const seg=segmentFactor[segment], uf=unitFactor[unit];
+  const scale = seg * (unit==='Все подразделения' ? 1 : uf);
+  const rev = b.rev * sc.rev * scale;
+  const ebitdaMargin = b.margin * sc.margin;
+  const ebitda = rev * ebitdaMargin / 100;
+  const ocf = b.ocf * sc.ocf * scale;
+  const avgCheck = b.avgCheck * (segment==='Дополнительные продукты' ? 0.72 : 1.03);
+  const conversion = Math.max(6.5, b.conv + (scenario==='Оптимистичный сценарий' ? 0.8 : scenario==='Консервативный сценарий' ? -0.7 : 0));
+  const leads = Math.round(b.leads * scale);
+  const payments = Math.round(leads * conversion / 100);
+  const budgetExec = Math.min(112, Math.max(88, b.budgetExec + (scenario==='Оптимистичный сценарий' ? 2.4 : scenario==='Консервативный сценарий' ? -3.1 : 0)));
+  const freeCash = b.freeCash * (scenario==='Консервативный сценарий' ? 0.84 : scenario==='Оптимистичный сценарий' ? 1.12 : 1) * (segment==='ГК' ? 1 : 0.45);
+  const reserveFund = freeCash * 0.42;
+  const toPlacement = Math.max(0, freeCash - reserveFund);
+  const placementIncome = toPlacement * 0.013;
+  const yearPlan = b.yPlan;
+  const yearForecast = b.yForecast * sc.forecast;
+  const toPlan = yearForecast - yearPlan;
+  return {period, scenario, segment, unit, rev, ebitda, ebitdaMargin, ocf, avgCheck, conversion, leads, payments, budgetExec, freeCash, reserveFund, toPlacement, placementIncome, yearPlan, yearForecast, toPlan, probability: sc.prob};
+}
+function bars(id, labels, vals){
+  const el=document.getElementById(id); if(!el) return;
+  const max=Math.max(...vals)*1.08;
+  el.innerHTML=vals.map((v,i)=>`<div class="bar-wrap"><div class="bar" style="height:${Math.max(8,v/max*100)}%"></div><div class="bar-label">${labels[i]}<br><b>${fmtMoney(v)}</b></div></div>`).join('');
+}
+function barsMixed(id, labels, vals, splitIndex=0){
+  const el=document.getElementById(id); if(!el) return;
+  const max=Math.max(...vals)*1.08;
+  el.innerHTML=vals.map((v,i)=>`<div class="bar-wrap"><div class="bar ${i>=splitIndex ? 'alt' : ''}" style="height:${Math.max(8,v/max*100)}%"></div><div class="bar-label">${labels[i]}<br><b>${fmtMoney(v)}</b></div></div>`).join('');
+}
+function renderOverview(s){
+  bindText('rev', fmtMoney(s.rev));
+  bindText('ebitda', fmtMoney(s.ebitda));
+  bindText('ebitdaMargin', fmtPct(s.ebitdaMargin));
+  bindText('ocf', fmtMoney(s.ocf));
+  bindText('budgetExec', fmtPct(s.budgetExec));
+  bindText('budgetExecDelta', s.budgetExec >= 100 ? 'выше плана' : 'ниже плана');
+  bindText('yearForecast', fmtMoney(s.yearForecast));
+  bindText('avgCheck', `${s.avgCheck.toFixed(2).replace('.', ',')} тыс.\u00A0₽`);
+  bindText('conversion', fmtPct(s.conversion));
+  bindText('freeCash', fmtMoney(s.freeCash));
+  bindText('overviewScope', `${s.period} · ${s.segment} · ${s.scenario}`);
+  const revSeries = [s.rev*0.83, s.rev*0.92, s.rev*0.98, s.rev];
+  const revLabels = s.period==='2026 YTD' ? ['Q1','Q2','Q3','Q4*'] : ['Июн','Июл','Авг','Сен'];
+  bars('revenueChart', revLabels, revSeries);
+  document.getElementById('overviewSignals').innerHTML = `
+    <div class="signal"><div class="icon">₽</div><div><b>${fmtMoney(s.toPlacement)} доступно к размещению</b><p>Есть потенциал дохода от размещения свободных денежных средств при сохранении резервного фонда.</p></div></div>
+    <div class="signal"><div class="icon">Δ</div><div><b>Бюджет исполнен на ${fmtPct(s.budgetExec)}</b><p>Ключевой контроль — удержать темп выручки и дисциплину расходов в ${s.segment.toLowerCase()}.</p></div></div>
+    <div class="signal"><div class="icon">F</div><div><b>Прогноз года ${fmtMoney(s.yearForecast)}</b><p>Скользящий прогноз показывает ${s.toPlan>=0?'превышение':'риск недовыполнения'} плана на ${fmtMoney(Math.abs(s.toPlan))}.</p></div></div>`;
+  const rows = [
+    ['Маркетинг', s.rev*0.24, s.rev*0.247, s.rev*0.007, 'warn'],
+    ['Продажи', s.rev*0.11, s.rev*0.106, -s.rev*0.004, 'good'],
+    ['Продукт', s.rev*0.14, s.rev*0.143, s.rev*0.003, 'warn'],
+    ['Административный блок', s.rev*0.07, s.rev*0.066, -s.rev*0.004, 'good'],
+    ['Образовательный блок', s.rev*0.19, s.rev*0.188, -s.rev*0.002, 'good'],
+  ];
+  document.getElementById('budgetSummaryBody').innerHTML = rows.map(r=>`<tr><td>${r[0]}</td><td>${fmtMoney(r[1])}</td><td>${fmtMoney(r[2])}</td><td>${r[3]<0?'−':''}${fmtMoney(Math.abs(r[3]))}</td><td>${pill(r[3]>0?'выше плана':'в норме', r[4])}</td></tr>`).join('');
+}
+function renderBudget(s){
+  bindText('budgetRevenue', fmtMoney(s.rev/ (s.budgetExec/100)));
+  bindText('actualRevenue', fmtMoney(s.rev));
+  const variance = s.rev - s.rev/(s.budgetExec/100);
+  bindText('budgetVariance', `${variance>=0?'+':'−'}${fmtMoney(Math.abs(variance))}`);
+  const rows = [
+    ['Выручка', s.rev/(s.budgetExec/100), s.rev],
+    ['Маркетинг', s.rev*0.22, s.rev*0.228],
+    ['ФОТ', s.rev*0.28, s.rev*0.274],
+    ['Продукт', s.rev*0.12, s.rev*0.118],
+    ['Административные расходы', s.rev*0.07, s.rev*0.071],
+    ['Операционная прибыль', s.ebitda*0.96, s.ebitda]
+  ];
+  document.getElementById('planFactBody').innerHTML = rows.map(r=>{
+    const d=r[2]-r[1], p=d/r[1]*100;
+    return `<tr><td>${r[0]}</td><td>${fmtMoney(r[1])}</td><td>${fmtMoney(r[2])}</td><td>${d>=0?'+':'−'}${fmtMoney(Math.abs(d))}</td><td>${p>=0?'+':''}${fmtPct(p)}</td></tr>`;
+  }).join('');
+  const water = [
+    ['План', s.rev/(s.budgetExec/100), false],
+    ['Цена', Math.abs(variance)*0.26, true],
+    ['Объем', Math.abs(variance)*0.38, true],
+    ['Конверсия', Math.abs(variance)*0.21, true],
+    ['Расходы', Math.abs(variance)*0.15, true],
+    ['Факт', s.rev, false]
+  ];
+  const max = Math.max(...water.map(x=>x[1]));
+  document.getElementById('varianceWaterfall').innerHTML = water.map(w=>`<div class="wf-col"><div class="wf-bar ${w[2]?'alt':''}" style="height:${Math.max(10,w[1]/max*100)}%"></div><div class="wf-label">${w[0]}<br><b>${fmtMoney(w[1])}</b></div></div>`).join('');
+}
+function renderForecast(s){
+  bindText('planYear', fmtMoney(s.yearPlan));
+  bindText('toPlan', `${s.toPlan>=0?'+':'−'}${fmtMoney(Math.abs(s.toPlan))}`);
+  bindText('planProbability', fmtPct(s.probability,0));
+  const actual = [152,164,171,178];
+  const forecast = [183,188,196,201];
+  const scale = s.segment==='ГК' ? 1 : {'Основные курсы':0.42,'Премиум-программы':0.36,'Дополнительные продукты':0.22}[s.segment];
+  const vals = [...actual.map(v=>v*scale), ...forecast.map(v=>v*scale)];
+  const labels = ['Янв','Фев','Мар','Апр','Сен','Окт','Ноя','Дек'];
+  barsMixed('forecastChart', labels, vals, 4);
+  const scenarios = [
+    ['Консервативный', s.yearForecast*0.95, s.ebitda*11.2, s.ocf*5.4, 'умеренный темп привлечения'],
+    ['Базовый', s.yearForecast, s.ebitda*12.1, s.ocf*5.9, 'выполнение текущей модели'],
+    ['Оптимистичный', s.yearForecast*1.06, s.ebitda*12.9, s.ocf*6.5, 'рост конверсии и чека']
+  ];
+  document.getElementById('scenarioBody').innerHTML = scenarios.map(r=>`<tr><td>${r[0]}</td><td>${fmtMoney(r[1])}</td><td>${fmtMoney(r[2])}</td><td>${fmtMoney(r[3])}</td><td>${r[4]}</td></tr>`).join('');
+}
+
+function renderFinancialWaterfall(id, items){
+  const el=document.getElementById(id);
+  if(!el) return;
+
+  const max=Math.max(...items.map(x=>Math.abs(x.value)),1);
+  el.innerHTML=items.map(item=>{
+    const h=Math.max(5,Math.min(100,Math.abs(item.value)/max*100));
+    const cls=item.type==='negative'?'negative':item.type==='neutral'?'neutral':'';
+    const sign=item.value<0?'−':'';
+    return `<div class="fin-wf-item">
+      <div class="fin-wf-val">${sign}${fmtMoney(Math.abs(item.value))}</div>
+      <div class="fin-wf-track"><div class="fin-wf-bar ${cls}" style="height:${h}%"></div></div>
+      <div class="fin-wf-label">${item.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderStatements(s){
+  const pl = [
+    ['Выручка', s.rev],
+    ['Себестоимость образовательного продукта', -s.rev*0.19],
+    ['Валовая прибыль', s.rev*0.81],
+    ['Маркетинг', -s.rev*0.23],
+    ['ФОТ и бонусы', -s.rev*0.28],
+    ['Продукт и разработка', -s.rev*0.11],
+    ['Административные расходы', -s.rev*0.06],
+    ['Операционная прибыль (EBITDA)', s.ebitda]
+  ];
+  document.getElementById('plBody').innerHTML = pl.map(r=>`<tr><td>${r[0]}</td><td>${r[1]<0?'−':''}${fmtMoney(Math.abs(r[1]))}</td><td>${fmtPct(Math.abs(r[1])/s.rev*100)}</td></tr>`).join('');
+  renderFinancialWaterfall('plWaterfall',[
+    {label:'Выручка',value:s.rev,type:'positive'},
+    {label:'Себестоимость',value:-s.rev*0.19,type:'negative'},
+    {label:'Маркетинг',value:-s.rev*0.23,type:'negative'},
+    {label:'ФОТ',value:-s.rev*0.28,type:'negative'},
+    {label:'Прочие',value:-s.rev*0.17,type:'negative'},
+    {label:'EBITDA',value:s.ebitda,type:'positive'}
+  ]);
+  const cf = [
+    ['Поступления от клиентов', s.rev],
+    ['Маркетинг', -s.rev*0.22],
+    ['ФОТ', -s.rev*0.27],
+    ['Прочие операционные расходы', -s.rev*0.15],
+    ['Операционный денежный поток', s.ocf],
+    ['Инвестиции', -s.rev*0.03],
+    ['Чистый денежный поток', s.ocf - s.rev*0.03]
+  ];
+  document.getElementById('cfBody').innerHTML = cf.map(r=>`<tr><td>${r[0]}</td><td>${r[1]<0?'−':''}${fmtMoney(Math.abs(r[1]))}</td><td>${r[1]>=0?'приход':'расход'}</td></tr>`).join('');
+  renderFinancialWaterfall('cfWaterfall',[
+    {label:'Поступления',value:s.rev,type:'positive'},
+    {label:'Маркетинг',value:-s.rev*0.22,type:'negative'},
+    {label:'ФОТ',value:-s.rev*0.27,type:'negative'},
+    {label:'Прочие расходы',value:-s.rev*0.15,type:'negative'},
+    {label:'Инвестиции',value:-s.rev*0.03,type:'negative'},
+    {label:'Чистый поток',value:s.ocf-s.rev*0.03,type:'positive'}
+  ]);
+  const assets = s.rev*0.62;
+  const bal = [
+    ['Деньги', s.freeCash],
+    ['Дебиторская задолженность', s.rev*0.06],
+    ['Авансы и прочие оборотные активы', s.rev*0.05],
+    ['НМА и основные средства', assets - s.freeCash - s.rev*0.06 - s.rev*0.05],
+    ['Кредиторская задолженность', -s.rev*0.09],
+    ['Собственный капитал', -(assets - s.rev*0.09)]
+  ];
+  document.getElementById('balBody').innerHTML = bal.map(r=>`<tr><td>${r[0]}</td><td>${r[1]<0?'−':''}${fmtMoney(Math.abs(r[1]))}</td><td>${fmtPct(Math.abs(r[1])/assets*100)}</td></tr>`).join('');
+  renderFinancialWaterfall('balWaterfall',[
+    {label:'Деньги',value:s.freeCash,type:'positive'},
+    {label:'Дебиторка',value:s.rev*0.06,type:'positive'},
+    {label:'Прочие активы',value:s.rev*0.05,type:'positive'},
+    {label:'НМА и ОС',value:Math.max(0,assets-s.freeCash-s.rev*0.11),type:'positive'},
+    {label:'Кредиторка',value:-s.rev*0.09,type:'negative'},
+    {label:'Капитал',value:assets-s.rev*0.09,type:'neutral'}
+  ]);
+}
+function renderDrivers(s){
+  document.getElementById('driversBody').innerHTML = [
+    ['1', 'Лиды', fmtNum(s.leads), 'рост лидов увеличивает число оплат'],
+    ['2', 'Конверсия в оплату', fmtPct(s.conversion), 'влияет на выручку быстрее остальных факторов'],
+    ['3', 'Количество оплат', fmtNum(s.payments), 'основа прогноза выручки'],
+    ['4', 'Средний чек', `${s.avgCheck.toFixed(2).replace('.', ',')} тыс.\u00A0₽`, 'влияет на выручку и валовую прибыль'],
+    ['5', 'Маркетинг / выручка', fmtPct(22.8), 'ключ к эффективности привлечения'],
+    ['6', 'ФОТ / выручка', fmtPct(27.4), 'контроль операционного рычага'],
+    ['7', 'Операционная рентабельность', fmtPct(s.ebitdaMargin), 'финальный показатель модели']
+  ].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('');
+  bindText('leads', fmtNum(s.leads));
+  bindText('payments', fmtNum(s.payments));
+  bindText('marketingShare', fmtPct(22.8));
+  bindText('payrollShare', fmtPct(27.4));
+}
+function renderTreasury(s){
+  const series = [s.freeCash*0.94,s.freeCash*0.91,s.freeCash*0.86,s.freeCash*0.89,s.freeCash*0.93,s.freeCash*0.97,s.freeCash*1.01,s.freeCash];
+  bars('cashChart', ['Нед.1','Нед.2','Нед.3','Нед.4','Нед.5','Нед.6','Нед.7','Нед.8'], series);
+  bindText('reserveFund', fmtMoney(s.reserveFund));
+  bindText('toPlacement', fmtMoney(s.toPlacement));
+  bindText('placementIncome', fmtMoney(s.placementIncome,2));
+  const paymentRows = [
+    ['ФОТ', s.rev*0.064, 'критично', 'к оплате'],
+    ['Подрядчики и платформы', s.rev*0.032, 'высокий', 'к оплате'],
+    ['Маркетинговые площадки', s.rev*0.045, 'высокий', 'подтверждено'],
+    ['Налоги', s.rev*0.028, 'критично', 'по графику'],
+    ['Прочие расходы', s.rev*0.011, 'средний', 'в работе']
+  ];
+  const priorityClass = {
+    'критично':'priority-critical',
+    'высокий':'priority-high',
+    'средний':'priority-medium'
+  };
+  const statusClass = {
+    'к оплате':'status-pay',
+    'подтверждено':'status-confirmed',
+    'по графику':'status-schedule',
+    'в работе':'status-work'
+  };
+  document.getElementById('paymentsBody').innerHTML = paymentRows.map(r=>`
+    <tr>
+      <td>${r[0]}</td>
+      <td>${fmtMoney(r[1])}</td>
+      <td><span class="payment-badge ${priorityClass[r[2]] || ''}">${r[2]}</span></td>
+      <td><span class="payment-badge ${statusClass[r[3]] || ''}">${r[3]}</span></td>
+    </tr>`).join('');
+  document.getElementById('treasurySignals').innerHTML = `
+    <div class="signal"><div class="icon">₽</div><div><b>${fmtMoney(s.toPlacement)} можно направить в размещение</b><p>После сохранения резервного фонда и покрытия обязательных недельных платежей.</p></div></div>
+    <div class="signal"><div class="icon">!</div><div><b>Риск кассового разрыва не прогнозируется</b><p>Минимальный недельный остаток выше порога безопасности.</p></div></div>
+    <div class="signal"><div class="icon">↗</div><div><b>Модель размещения даёт ${fmtMoney(s.placementIncome,2)} дохода</b><p>Нужно закрепить правила сроков и лимитов размещения свободных денег.</p></div></div>`;
+}
+
+let financialModelInitialized = false;
+
+function clampValue(v, min, max){
+  const n = Number(v);
+  if(!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+function initFinancialModel(s){
+  const config = [
+    ['fmLeads','fmLeadsRange',1000,2000000,Math.round(s.leads)],
+    ['fmConversion','fmConversionRange',1,30,s.conversion],
+    ['fmAvgCheck','fmAvgCheckRange',1,100,s.avgCheck],
+    ['fmMarketing','fmMarketingRange',0,60,22.8],
+    ['fmPayroll','fmPayrollRange',0,60,27.4],
+    ['fmOtherCosts','fmOtherCostsRange',0,50,25.0]
+  ];
+
+  config.forEach(([numId,rangeId,min,max,val])=>{
+    const num=document.getElementById(numId);
+    const range=document.getElementById(rangeId);
+    if(!num || !range) return;
+    num.value=val;
+    range.value=val;
+
+    const syncFromNumber=()=>{
+      const v=clampValue(num.value,min,max);
+      num.value=v;
+      range.value=v;
+      calculateFinancialModel();
+    };
+    const syncFromRange=()=>{
+      num.value=range.value;
+      calculateFinancialModel();
+    };
+
+    if(!financialModelInitialized){
+      num.addEventListener('input',syncFromNumber);
+      range.addEventListener('input',syncFromRange);
+    }
+  });
+
+  if(!financialModelInitialized){
+    financialModelInitialized = true;
+  }
+  calculateFinancialModel();
+}
+
+function calculateFinancialModel(){
+  const get=(id, fallback=0)=>{
+    const el=document.getElementById(id);
+    const n=el ? Number(el.value) : fallback;
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const leads=Math.max(0,get('fmLeads'));
+  const conversion=Math.max(0,get('fmConversion'))/100;
+  const avgCheckThousand=Math.max(0,get('fmAvgCheck'));
+  const marketing=Math.max(0,get('fmMarketing'))/100;
+  const payroll=Math.max(0,get('fmPayroll'))/100;
+  const other=Math.max(0,get('fmOtherCosts'))/100;
+
+  const payments=Math.round(leads*conversion);
+  const revenueMln=payments*avgCheckThousand/1000;
+  const totalCostShare=marketing+payroll+other;
+  const ebitdaMln=revenueMln*(1-totalCostShare);
+  const margin=revenueMln>0 ? ebitdaMln/revenueMln*100 : 0;
+
+  const set=(id,val)=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=val;
+  };
+
+  set('fmPaymentsResult',fmtNum(payments));
+  set('fmRevenueResult',fmtMoney(revenueMln));
+  set('fmEbitdaResult',`${ebitdaMln<0?'−':''}${fmtMoney(Math.abs(ebitdaMln))}`);
+  set('fmMarginResult',fmtPct(margin));
+
+  const marginEl=document.getElementById('fmMarginResult');
+  const ebitdaEl=document.getElementById('fmEbitdaResult');
+  [marginEl,ebitdaEl].forEach(el=>{
+    if(!el) return;
+    el.classList.remove('good','warn','bad');
+    el.classList.add(margin>=20?'good':margin>=10?'warn':'bad');
+  });
+}
+
+function update(){
+  const s=getState();
+  document.getElementById('badge').textContent = `ДЕМО · ${s.period} · ${s.segment}`;
+  renderOverview(s);
+  renderBudget(s);
+  renderForecast(s);
+  renderStatements(s);
+  renderDrivers(s);
+  renderTreasury(s);
+  initFinancialModel(s);
+}
+document.querySelectorAll('select').forEach(x=>x.addEventListener('change', update));
+update();
+</script>
+</body>
+</html>
