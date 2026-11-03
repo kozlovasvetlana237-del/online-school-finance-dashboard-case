@@ -598,6 +598,7 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
 </main>
 
 <script>
+if(false){
 const tabs=document.querySelectorAll('.nav button');
 tabs.forEach(btn=>btn.addEventListener('click',()=>{
   tabs.forEach(x=>x.classList.remove('active'));
@@ -974,6 +975,7 @@ function update(){
 }
 document.querySelectorAll('select').forEach(x=>x.addEventListener('change', update));
 update();
+}
 </script>
 <script type="module" src="./js/ui.js"></script>
 </body>

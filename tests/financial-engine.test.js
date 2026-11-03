@@ -54,3 +54,46 @@ test('prepayment remains deferred until service is delivered', () => {
   assert.equal(model.profitAndLoss.revenue, 0);
   assert.equal(model.balanceSheet.deferredRevenue, 42000);
 });
+
+test('refund reduces recognized revenue and cash inflow', () => {
+  const data = {
+    ...demoData,
+    periods: [{ id: '2026-01', month: '2026-01', status: 'closed' }],
+    sales: [{ id: 'refund', date: '2026-01-10', productId: 'core-course', channelId: 'content', grossAmount: 42000, paidAmount: 42000, refundAmount: 10000, serviceStart: '2026-01-01', serviceEnd: '2026-01-28' }],
+    expenses: [],
+    cashOperations: [{ id: 'refund-cash', date: '2026-01-10', type: 'operating', direction: 'inflow', amount: 32000, sourceId: 'refund' }],
+    openingBalances: { cash: 0, receivables: 0, otherAssets: 0, fixedAssets: 0, payables: 0, deferredRevenue: 0, otherLiabilities: 0, equity: 0 }
+  };
+  const model = calculateModel(data, { periodIds: ['2026-01'] });
+  assert.equal(model.profitAndLoss.revenue, 32000);
+  assert.equal(model.cashFlow.operating, 32000);
+});
+
+test('installment creates receivable without changing recognized revenue', () => {
+  const data = {
+    ...demoData,
+    periods: [{ id: '2026-01', month: '2026-01', status: 'closed' }],
+    sales: [{ id: 'installment', date: '2026-01-10', productId: 'core-course', channelId: 'content', grossAmount: 42000, paidAmount: 21000, refundAmount: 0, serviceStart: '2026-01-01', serviceEnd: '2026-01-28' }],
+    expenses: [],
+    cashOperations: [{ id: 'installment-cash', date: '2026-01-10', type: 'operating', direction: 'inflow', amount: 21000, sourceId: 'installment' }],
+    openingBalances: { cash: 0, receivables: 0, otherAssets: 0, fixedAssets: 0, payables: 0, deferredRevenue: 0, otherLiabilities: 0, equity: 0 }
+  };
+  const model = calculateModel(data, { periodIds: ['2026-01'] });
+  assert.equal(model.profitAndLoss.revenue, 42000);
+  assert.equal(model.balanceSheet.receivables, 21000);
+  assert.equal(model.balanceSheet.balanceCheck, 0);
+});
+
+test('higher teaching cost reduces EBITDA', () => {
+  const base = calculateProfitAndLoss(demoData, { periodIds: ['2026-09'] });
+  const changed = { ...demoData, expenses: demoData.expenses.map((expense) => expense.category === 'Преподавание' && expense.date.startsWith('2026-09') ? { ...expense, amount: expense.amount * 2 } : expense) };
+  const increased = calculateProfitAndLoss(changed, { periodIds: ['2026-09'] });
+  assert.ok(increased.ebitda < base.ebitda);
+});
+
+test('moving a payment out of the selected period changes cash only', () => {
+  const base = calculateCashFlow(demoData, { periodIds: ['2026-09'] });
+  const moved = { ...demoData, cashOperations: demoData.cashOperations.map((operation) => operation.date === '2026-09-01' ? { ...operation, date: '2026-10-01' } : operation) };
+  const changed = calculateCashFlow(moved, { periodIds: ['2026-09'] });
+  assert.notEqual(changed.operating, base.operating);
+});
