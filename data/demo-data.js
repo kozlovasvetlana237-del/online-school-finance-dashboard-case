@@ -72,6 +72,36 @@ const budgets = periods.map((period) => [
   { periodId: period.id, businessUnitId: 'core', category: 'Административные расходы', amount: 80000 }
 ]).flat();
 
+const driverMonths = Array.from({ length: 12 }, (_, index) => {
+  const periodId = `2026-${String(index + 1).padStart(2, '0')}`;
+  const status = index < 9 ? 'closed' : 'forecast';
+  const plan = { leads: 9200 + index * 180, conversion: 8.8 + index * 0.08, averageCheck: 42000 + index * 500, refunds: 0.035, marketing: 230000 + index * 5000, directCosts: 490000, payroll: 280000, admin: 80000 };
+  const actual = { ...plan, leads: 9000 + index * 220, conversion: 8.6 + index * 0.1, averageCheck: 41500 + index * 650, refunds: index === 8 ? 0.06 : 0.025, marketing: 225000 + index * 6500 };
+  const forecast = { ...plan, leads: 9800 + index * 240, conversion: 9.1 + index * 0.1, averageCheck: 43000 + index * 700, refunds: 0.025, marketing: 235000 + index * 5500 };
+  return { periodId, status, plan, actual, forecast };
+});
+
+const previousForecast = driverMonths.map(({ periodId, plan }) => ({
+  periodId,
+  revenue: plan.leads * plan.conversion / 100 * plan.averageCheck * (1 - plan.refunds),
+  ebitda: plan.leads * plan.conversion / 100 * plan.averageCheck * (1 - plan.refunds) - plan.directCosts - plan.marketing - plan.payroll - plan.admin
+}));
+
+const customers = [];
+const repeatPurchases = [];
+sales.forEach((sale, index) => {
+  const customerId = `demo-customer-${String(index % 180).padStart(3, '0')}`;
+  const firstPaymentMonth = customers.find((customer) => customer.id === customerId)?.firstPaymentMonth || sale.date.slice(0, 7);
+  sale.customerId = customerId;
+  sale.firstPaymentMonth = firstPaymentMonth;
+  sale.isRepeatPurchase = firstPaymentMonth !== sale.date.slice(0, 7);
+  if (!customers.some((customer) => customer.id === customerId)) customers.push({ id: customerId, firstPaymentMonth, productId: sale.productId, channelId: sale.channelId });
+  if (sale.isRepeatPurchase) repeatPurchases.push({ id: `repeat-${sale.id}`, customerId, date: sale.date, productId: sale.productId, amount: sale.paidAmount, refundAmount: sale.refundAmount });
+});
+
+const acquisitionExpenses = periods.map((period) => channels.map((channel, index) => ({ periodId: period.id, channelId: channel.id, productId: products[index % products.length].id, amount: 75000 + index * 25000 }))).flat();
+const directCostsByProduct = { 'core-course': 16000, 'premium-course': 36000, 'additional-course': 6000 };
+
 export const demoData = {
   periods,
   businessUnits,
@@ -81,6 +111,20 @@ export const demoData = {
   expenses,
   cashOperations,
   budgets,
+  drivers: {
+    months: driverMonths,
+    previousForecast,
+    thresholds: {
+      marketingOverrunPercent: 5,
+      ebitdaMarginMinimum: 20,
+      forecastShortfallPercent: 3,
+      refundRateMaximum: 5
+    }
+  },
+  customers,
+  repeatPurchases,
+  acquisitionExpenses,
+  directCostsByProduct,
   openingBalances: {
     cash: 2500000,
     receivables: 0,

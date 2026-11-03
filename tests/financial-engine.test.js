@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { demoData } from '../data/demo-data.js';
-import { calculateModel, calculateProfitAndLoss, calculateCashFlow } from '../js/financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance } from '../js/analytics.js';
+import { calculateModel, calculateProfitAndLoss, calculateCashFlow, calculateRollingForecast } from '../js/financial-engine.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix } from '../js/analytics.js';
 
 test('financial model has no invalid numbers', () => {
   const model = calculateModel(demoData, { periodIds: ['2026-09'] });
@@ -96,4 +96,60 @@ test('moving a payment out of the selected period changes cash only', () => {
   const moved = { ...demoData, cashOperations: demoData.cashOperations.map((operation) => operation.date === '2026-09-01' ? { ...operation, date: '2026-10-01' } : operation) };
   const changed = calculateCashFlow(moved, { periodIds: ['2026-09'] });
   assert.notEqual(changed.operating, base.operating);
+});
+
+test('revenue bridge factors sum to total variance', () => {
+  const plan = { leads: 100, conversion: 10, averageCheck: 1000, refunds: 0 };
+  const actual = { leads: 120, conversion: 12, averageCheck: 1100, refunds: 0.05 };
+  const bridge = calculateRevenueBridge(plan, actual);
+  assert.equal(Math.round(bridge.factors.reduce((sum, factor) => sum + factor.impact, 0)), Math.round(bridge.totalVariance));
+});
+
+test('EBITDA bridge factors sum to total variance', () => {
+  const plan = { revenue: 1000, costOfSales: 200, marketing: 100, sales: 50, payroll: 200, admin: 50, ebitda: 400 };
+  const actual = { revenue: 1100, costOfSales: 220, marketing: 120, sales: 55, payroll: 210, admin: 60, ebitda: 435 };
+  const bridge = calculateEbitdaBridge(plan, actual);
+  assert.equal(bridge.sumOfImpacts, bridge.totalVariance);
+});
+
+test('rolling forecast has 12 ordered months and preserves closed fact', () => {
+  const base = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: 'base' });
+  const optimistic = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: 'optimistic' });
+  assert.equal(base.months.length, 12);
+  assert.deepEqual(base.months.map((month) => month.periodId), demoData.drivers.months.map((month) => month.periodId));
+  assert.deepEqual(base.months.slice(0, 9).map((month) => month.revenue), optimistic.months.slice(0, 9).map((month) => month.revenue));
+  assert.ok(optimistic.annual.revenue > base.annual.revenue);
+});
+
+test('signals do not invent a cause', () => {
+  const signals = buildFinancialSignals({
+    planFact: { marketing: { relative: 10 } },
+    forecast: { shortfallPercent: 0 },
+    model: { profitAndLoss: { revenue: 100, ebitda: 10 } },
+    thresholds: { marketingOverrunPercent: 5, ebitdaMarginMinimum: 20, forecastShortfallPercent: 3 }
+  });
+  assert.equal(signals.some((signal) => signal.status === 'требует анализа'), true);
+  assert.equal(signals.some((signal) => signal.cause === 'подтверждено план-факт данными'), true);
+});
+
+test('unit economics calculates CAC from acquisition costs and new customers', () => {
+  const result = calculateUnitEconomics(demoData, { productId: 'core-course' })[0];
+  const acquisition = demoData.acquisitionExpenses.filter((item) => item.productId === 'core-course').reduce((sum, item) => sum + item.amount, 0);
+  assert.equal(result.cac, acquisition / result.newCustomers);
+  assert.equal(result.ltvCac, result.ltvGrossProfit / result.cac);
+});
+
+test('cohort matrix keeps active and repeat retention separate', () => {
+  const matrix = calculateCohortMatrix(demoData, 'activeRetention');
+  assert.ok(matrix.cohorts.length > 0);
+  assert.ok(matrix.cohorts.every((cohort) => cohort.activeRetention === null || Number.isFinite(cohort.activeRetention)));
+  assert.ok(matrix.cohorts.some((cohort) => cohort.repeatPurchaseRetention !== cohort.activeRetention));
+});
+
+test('zero new customers produces unavailable CAC and LTV', () => {
+  const data = { ...demoData, sales: [], customers: [], repeatPurchases: [] };
+  const result = calculateUnitEconomics(data, { productId: 'core-course' })[0];
+  assert.equal(result.cac, null);
+  assert.equal(result.ltvGrossProfit, null);
+  assert.equal(result.ltvCac, null);
 });

@@ -16,6 +16,43 @@ export function calculateBudgetVariance(plan, actual, kind = 'income') {
   return { plan, actual, absolute, relative, favorable };
 }
 
+function driverRevenue(drivers) {
+  return drivers.leads * drivers.conversion / 100 * drivers.averageCheck * (1 - drivers.refunds);
+}
+
+export function calculateRevenueBridge(planDrivers, actualDrivers) {
+  const keys = [
+    ['leads', 'Лиды'],
+    ['conversion', 'Конверсия'],
+    ['averageCheck', 'Средний чек'],
+    ['refunds', 'Возвраты']
+  ];
+  const base = { ...planDrivers };
+  const planRevenue = driverRevenue(base);
+  let previous = planRevenue;
+  const factors = keys.map(([key, label]) => {
+    const next = { ...base, [key]: actualDrivers[key] };
+    const value = driverRevenue(next);
+    const impact = value - previous;
+    base[key] = actualDrivers[key];
+    previous = value;
+    return { key, label, impact, method: 'sequential_substitution' };
+  });
+  return { planRevenue, actualRevenue: previous, totalVariance: previous - planRevenue, factors, method: 'sequential_substitution' };
+}
+
+export function calculateEbitdaBridge(planPl, actualPl) {
+  const factors = [
+    { key: 'revenue', label: 'Отклонение признанной выручки', impact: actualPl.revenue - planPl.revenue },
+    { key: 'costOfSales', label: 'Отклонение себестоимости', impact: -(actualPl.costOfSales - planPl.costOfSales) },
+    { key: 'marketing', label: 'Отклонение маркетинга', impact: -(actualPl.marketing - planPl.marketing) },
+    { key: 'payroll', label: 'Отклонение ФОТ', impact: -(actualPl.payroll - planPl.payroll) },
+    { key: 'otherOperating', label: 'Отклонение прочих расходов', impact: -((actualPl.sales + actualPl.admin) - (planPl.sales + planPl.admin)) }
+  ];
+  const totalVariance = actualPl.ebitda - planPl.ebitda;
+  return { totalVariance, factors, sumOfImpacts: factors.reduce((sum, factor) => sum + factor.impact, 0) };
+}
+
 export function calculateAnnualForecast(periodResults, closedPeriodIds) {
   const closed = periodResults.filter((item) => closedPeriodIds.includes(item.periodId));
   const remaining = periodResults.filter((item) => !closedPeriodIds.includes(item.periodId));
@@ -38,6 +75,74 @@ export function calculateControlChecks(model) {
     noInvalidNumbers: Object.values({ ...pl, ...cf, ...bs }).every(Number.isFinite)
   };
   return { ...checks, allPassed: Object.values(checks).every((value) => value === true || value === 0) };
+}
+
+export function buildFinancialSignals({ planFact, forecast, model, thresholds }) {
+  const signals = [];
+  const marketing = planFact?.marketing;
+  if (marketing && marketing.relative !== null && marketing.relative > thresholds.marketingOverrunPercent) {
+    signals.push({ id: 'marketing-overrun', title: 'Превышение бюджета маркетинга', problem: 'Факт маркетинга выше плана', basis: `${marketing.relative.toFixed(1)}%`, cause: 'подтверждено план-факт данными', consequence: 'снижение EBITDA', action: 'проверить кампании и перераспределить бюджет', owner: 'руководитель маркетинга', status: 'к действию', severity: 'warning' });
+  }
+  const margin = model?.profitAndLoss?.revenue ? model.profitAndLoss.ebitda / model.profitAndLoss.revenue * 100 : null;
+  if (margin !== null && margin < thresholds.ebitdaMarginMinimum) {
+    signals.push({ id: 'margin-risk', title: 'Низкая EBITDA margin', problem: 'Маржинальность ниже порога', basis: `${margin.toFixed(1)}%`, cause: 'недостаточно данных для детализации причины', consequence: 'снижение запаса финансовой устойчивости', action: 'провести анализ себестоимости и расходов', owner: 'финансовый руководитель', status: 'требует анализа', severity: 'bad' });
+  }
+  if (forecast?.shortfallPercent > thresholds.forecastShortfallPercent) {
+    signals.push({ id: 'forecast-shortfall', title: 'Риск недовыполнения прогноза', problem: 'Прогноз ниже утверждённого бюджета', basis: `${forecast.shortfallPercent.toFixed(1)}%`, cause: forecast.cause || 'недостаточно данных для детализации причины', consequence: 'недополучение выручки', action: 'обновить драйверы продаж и план действий', owner: 'руководитель продаж', status: forecast.cause ? 'к действию' : 'требует анализа', severity: 'bad' });
+  }
+  return signals;
+}
+
+function unique(values) {
+  return [...new Set(values)];
+}
+
+function productSales(data, productId) {
+  return data.sales.filter((sale) => !productId || sale.productId === productId);
+}
+
+export function calculateUnitEconomics(data, filters = {}) {
+  const products = data.products.filter((product) => !filters.productId || product.id === filters.productId);
+  return products.map((product) => {
+    const sales = productSales(data, product.id).filter((sale) => !filters.channelId || sale.channelId === filters.channelId);
+    const customers = unique(sales.map((sale) => sale.customerId));
+    const newCustomers = unique(sales.filter((sale) => !sale.isRepeatPurchase).map((sale) => sale.customerId));
+    const revenue = sales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount, 0);
+    const directCosts = sales.reduce((sum, sale) => sum + (data.directCostsByProduct[product.id] || 0), 0);
+    const grossProfit = revenue - directCosts;
+    const acquisition = data.acquisitionExpenses.filter((item) => item.productId === product.id && (!filters.channelId || item.channelId === filters.channelId)).reduce((sum, item) => sum + item.amount, 0);
+    const cac = newCustomers.length ? acquisition / newCustomers.length : null;
+    const ltvRevenue = newCustomers.length ? revenue / newCustomers.length : null;
+    const ltvGrossProfit = newCustomers.length ? grossProfit / newCustomers.length : null;
+    const ltvCac = cac && cac > 0 ? ltvGrossProfit / cac : null;
+    const monthlyGrossProfit = new Map();
+    sales.forEach((sale) => {
+      const month = sale.date.slice(0, 7);
+      monthlyGrossProfit.set(month, (monthlyGrossProfit.get(month) || 0) + sale.grossAmount - sale.refundAmount - (data.directCostsByProduct[product.id] || 0));
+    });
+    let cumulative = 0;
+    const paybackPeriod = cac === null ? null : [...monthlyGrossProfit.entries()].sort(([a], [b]) => a.localeCompare(b)).find(([month, value]) => { cumulative += value / Math.max(1, newCustomers.length); return cumulative >= cac ? month : false; })?.[0] || null;
+    return { productId: product.id, productName: product.name, buyers: customers.length, activeStudents: customers.length, averageCheck: sales.length ? revenue / sales.length : null, revenue, directCosts, grossProfit, contributionMargin: revenue ? grossProfit / revenue * 100 : null, newCustomers: newCustomers.length, cac, ltvRevenue, ltvGrossProfit, ltvCac, paybackPeriod };
+  });
+}
+
+export function calculateCohortMatrix(data, metric = 'revenue') {
+  const cohortMonths = unique(data.customers.map((customer) => customer.firstPaymentMonth)).sort();
+  const observedMonths = new Set(data.sales.map((sale) => sale.date.slice(0, 7)));
+  const cohorts = cohortMonths.map((cohortMonth) => {
+    const cohortCustomers = data.customers.filter((customer) => customer.firstPaymentMonth === cohortMonth);
+    const customerIds = new Set(cohortCustomers.map((customer) => customer.id));
+    const cohortSales = data.sales.filter((sale) => customerIds.has(sale.customerId));
+    const repeat = data.repeatPurchases.filter((purchase) => customerIds.has(purchase.customerId));
+    const cumulativeRevenue = cohortSales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount, 0);
+    const cumulativeGrossProfit = cohortSales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount - (data.directCostsByProduct[sale.productId] || 0), 0);
+    const lastObserved = [...observedMonths].sort().at(-1);
+    const activeCustomers = new Set(cohortSales.filter((sale) => sale.date.slice(0, 7) === lastObserved).map((sale) => sale.customerId)).size;
+    const repeatCustomers = new Set(repeat.map((purchase) => purchase.customerId)).size;
+    const values = { revenue: cumulativeRevenue, grossProfit: cumulativeGrossProfit, activeRetention: cohortCustomers.length ? activeCustomers / cohortCustomers.length * 100 : null, repeatPurchaseRetention: cohortCustomers.length ? repeatCustomers / cohortCustomers.length * 100 : null };
+    return { cohortMonth, newCustomers: cohortCustomers.length, repeatPurchases: repeat.length, activeRetention: values.activeRetention, repeatPurchaseRetention: values.repeatPurchaseRetention, averageRevenuePerCustomer: cohortCustomers.length ? cumulativeRevenue / cohortCustomers.length : null, cumulativeRevenue, cumulativeGrossProfit, cumulativeCacPayback: values[metric] ?? null };
+  });
+  return { cohorts, metric };
 }
 
 export { calculateModel };
