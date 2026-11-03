@@ -101,6 +101,28 @@ sales.forEach((sale, index) => {
 
 const acquisitionExpenses = periods.map((period) => channels.map((channel, index) => ({ periodId: period.id, channelId: channel.id, productId: products[index % products.length].id, amount: 75000 + index * 25000 }))).flat();
 const directCostsByProduct = { 'core-course': 16000, 'premium-course': 36000, 'additional-course': 6000 };
+const treasuryReceipts = Array.from({ length: 9 }, (_, index) => ({ id: `receipt-${index}`, date: `2026-${String(10 + Math.floor(index / 3)).padStart(2, '0')}-${String((index % 3) * 10 + 5).padStart(2, '0')}`, category: 'Поступления клиентов', amount: 450000, confirmed: index < 3 }));
+const treasuryPayments = [
+  { id: 'payroll-1', date: '2026-10-05', category: 'ФОТ', amount: 280000, mandatory: true, priority: 'critical', approvalStatus: 'approved' },
+  { id: 'platform-1', date: '2026-10-08', category: 'Платформа', amount: 70000, mandatory: true, priority: 'high', approvalStatus: 'approved' },
+  { id: 'marketing-1', date: '2026-10-12', category: 'Маркетинг', amount: 230000, mandatory: false, priority: 'high', approvalStatus: 'pending' },
+  { id: 'tax-1', date: '2026-10-20', category: 'Налоги', amount: 150000, mandatory: true, priority: 'critical', approvalStatus: 'scheduled' },
+  { id: 'contractor-1', date: '2026-11-05', category: 'Подрядчики', amount: 420000, mandatory: true, priority: 'high', approvalStatus: 'pending' },
+  { id: 'investment-1', date: '2026-11-15', category: 'Инвестиции', amount: 500000, mandatory: false, priority: 'medium', approvalStatus: 'pending' },
+  { id: 'payroll-2', date: '2026-12-05', category: 'ФОТ', amount: 280000, mandatory: true, priority: 'critical', approvalStatus: 'scheduled' }
+];
+const budgetControl = businessUnits.map((unit, index) => ({
+  id: `budget-${unit.id}`,
+  businessUnitId: unit.id,
+  owner: ['Руководитель FP&A', 'Руководитель продукта', 'Руководитель продаж'][index],
+  preparationStatus: index === 0 ? 'готово' : 'в работе',
+  approvalStatus: index === 0 ? 'согласовано' : 'на согласовании',
+  plannedDate: `2026-10-${String(10 + index * 5).padStart(2, '0')}`,
+  actualDate: index === 0 ? '2026-10-09' : null,
+  variance: index === 0 ? 'нет' : 'срок под угрозой',
+  correctiveAction: index === 0 ? 'поддерживать календарь' : 'назначить встречу с владельцем бюджета',
+  actionDueDate: `2026-10-${String(20 + index * 3).padStart(2, '0')}`
+}));
 
 export const demoData = {
   periods,
@@ -125,6 +147,9 @@ export const demoData = {
   repeatPurchases,
   acquisitionExpenses,
   directCostsByProduct,
+  treasuryReceipts,
+  treasuryPayments,
+  budgetControl,
   openingBalances: {
     cash: 2500000,
     receivables: 0,
