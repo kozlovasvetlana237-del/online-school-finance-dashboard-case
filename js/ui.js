@@ -1,6 +1,6 @@
 import { demoData } from '../data/demo-data.js';
 import { calculateModel, calculateRollingForecast } from './financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals } from './analytics.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix } from './analytics.js';
 
 export function bootstrap() {
   return demoData;
@@ -121,6 +121,11 @@ export function renderDashboard(model, state = selectedFilters()) {
   if (signalBox) signalBox.innerHTML = (signals.length ? signals : [{ title: 'Критичных сигналов нет', problem: 'Пороговые правила не сработали', basis: 'по выбранному периоду', cause: 'данных для риска нет', consequence: 'не выявлено', action: 'продолжить мониторинг', owner: 'финансовый руководитель', status: 'наблюдение' }]).map((signal) => `<div class="signal"><div class="icon">!</div><div><b>${signal.title}</b><p>${signal.problem}. Основание: ${signal.basis}. Причина: ${signal.cause}. Действие: ${signal.action}. Ответственный: ${signal.owner}. Статус: ${signal.status}.</p></div></div>`).join('');
   const probabilityCard = document.querySelector('[data-bind="planProbability"]')?.closest('.card');
   if (probabilityCard) probabilityCard.style.display = 'none';
+  const unitBody = document.getElementById('unitEconomicsBody');
+  if (unitBody) unitBody.innerHTML = calculateUnitEconomics(demoData).map((item) => `<tr><td>${item.productName}</td><td>${item.buyers}</td><td>${money(item.revenue)}</td><td>${money(item.grossProfit)}</td><td>${item.cac === null ? 'н/д' : money(item.cac, 2)}</td><td>${item.ltvGrossProfit === null ? 'н/д' : money(item.ltvGrossProfit)}</td><td>${item.ltvCac === null ? 'н/д' : item.ltvCac.toFixed(2).replace('.', ',')}</td><td>${item.paybackPeriod || 'н/д'}</td></tr>`).join('');
+  const metric = document.getElementById('cohortMetric')?.value || 'revenue';
+  const cohortBody = document.getElementById('cohortBody');
+  if (cohortBody) cohortBody.innerHTML = calculateCohortMatrix(demoData, metric).cohorts.map((cohort) => { const result = ['activeRetention', 'repeatPurchaseRetention'].includes(metric) ? cohort[metric] : cohort[metric]; return `<tr><td>${cohort.cohortMonth}</td><td>${cohort.newCustomers}</td><td>${cohort.repeatPurchases}</td><td>${cohort.activeRetention === null ? 'н/д' : percent(cohort.activeRetention)}</td><td>${cohort.repeatPurchaseRetention === null ? 'н/д' : percent(cohort.repeatPurchaseRetention)}</td><td>${money(cohort.averageRevenuePerCustomer)}</td><td>${result === null || result === undefined ? 'н/д' : ['activeRetention', 'repeatPurchaseRetention'].includes(metric) ? percent(result) : money(result)}</td></tr>`; }).join('');
   const badge = document.getElementById('badge');
   if (badge) badge.textContent = `ДЕМО · ${state.period} · единая финансовая модель`;
   const caseBox = document.querySelector('.case-box p');
@@ -134,4 +139,5 @@ if (typeof document !== 'undefined') {
   };
   document.addEventListener('DOMContentLoaded', update, { once: true });
   document.querySelectorAll('select').forEach((element) => element.addEventListener('change', update));
+  document.getElementById('cohortMetric')?.addEventListener('change', update);
 }

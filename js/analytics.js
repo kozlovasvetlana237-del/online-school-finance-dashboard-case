@@ -93,4 +93,56 @@ export function buildFinancialSignals({ planFact, forecast, model, thresholds })
   return signals;
 }
 
+function unique(values) {
+  return [...new Set(values)];
+}
+
+function productSales(data, productId) {
+  return data.sales.filter((sale) => !productId || sale.productId === productId);
+}
+
+export function calculateUnitEconomics(data, filters = {}) {
+  const products = data.products.filter((product) => !filters.productId || product.id === filters.productId);
+  return products.map((product) => {
+    const sales = productSales(data, product.id).filter((sale) => !filters.channelId || sale.channelId === filters.channelId);
+    const customers = unique(sales.map((sale) => sale.customerId));
+    const newCustomers = unique(sales.filter((sale) => !sale.isRepeatPurchase).map((sale) => sale.customerId));
+    const revenue = sales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount, 0);
+    const directCosts = sales.reduce((sum, sale) => sum + (data.directCostsByProduct[product.id] || 0), 0);
+    const grossProfit = revenue - directCosts;
+    const acquisition = data.acquisitionExpenses.filter((item) => item.productId === product.id && (!filters.channelId || item.channelId === filters.channelId)).reduce((sum, item) => sum + item.amount, 0);
+    const cac = newCustomers.length ? acquisition / newCustomers.length : null;
+    const ltvRevenue = newCustomers.length ? revenue / newCustomers.length : null;
+    const ltvGrossProfit = newCustomers.length ? grossProfit / newCustomers.length : null;
+    const ltvCac = cac && cac > 0 ? ltvGrossProfit / cac : null;
+    const monthlyGrossProfit = new Map();
+    sales.forEach((sale) => {
+      const month = sale.date.slice(0, 7);
+      monthlyGrossProfit.set(month, (monthlyGrossProfit.get(month) || 0) + sale.grossAmount - sale.refundAmount - (data.directCostsByProduct[product.id] || 0));
+    });
+    let cumulative = 0;
+    const paybackPeriod = cac === null ? null : [...monthlyGrossProfit.entries()].sort(([a], [b]) => a.localeCompare(b)).find(([month, value]) => { cumulative += value / Math.max(1, newCustomers.length); return cumulative >= cac ? month : false; })?.[0] || null;
+    return { productId: product.id, productName: product.name, buyers: customers.length, activeStudents: customers.length, averageCheck: sales.length ? revenue / sales.length : null, revenue, directCosts, grossProfit, contributionMargin: revenue ? grossProfit / revenue * 100 : null, newCustomers: newCustomers.length, cac, ltvRevenue, ltvGrossProfit, ltvCac, paybackPeriod };
+  });
+}
+
+export function calculateCohortMatrix(data, metric = 'revenue') {
+  const cohortMonths = unique(data.customers.map((customer) => customer.firstPaymentMonth)).sort();
+  const observedMonths = new Set(data.sales.map((sale) => sale.date.slice(0, 7)));
+  const cohorts = cohortMonths.map((cohortMonth) => {
+    const cohortCustomers = data.customers.filter((customer) => customer.firstPaymentMonth === cohortMonth);
+    const customerIds = new Set(cohortCustomers.map((customer) => customer.id));
+    const cohortSales = data.sales.filter((sale) => customerIds.has(sale.customerId));
+    const repeat = data.repeatPurchases.filter((purchase) => customerIds.has(purchase.customerId));
+    const cumulativeRevenue = cohortSales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount, 0);
+    const cumulativeGrossProfit = cohortSales.reduce((sum, sale) => sum + sale.grossAmount - sale.refundAmount - (data.directCostsByProduct[sale.productId] || 0), 0);
+    const lastObserved = [...observedMonths].sort().at(-1);
+    const activeCustomers = new Set(cohortSales.filter((sale) => sale.date.slice(0, 7) === lastObserved).map((sale) => sale.customerId)).size;
+    const repeatCustomers = new Set(repeat.map((purchase) => purchase.customerId)).size;
+    const values = { revenue: cumulativeRevenue, grossProfit: cumulativeGrossProfit, activeRetention: cohortCustomers.length ? activeCustomers / cohortCustomers.length * 100 : null, repeatPurchaseRetention: cohortCustomers.length ? repeatCustomers / cohortCustomers.length * 100 : null };
+    return { cohortMonth, newCustomers: cohortCustomers.length, repeatPurchases: repeat.length, activeRetention: values.activeRetention, repeatPurchaseRetention: values.repeatPurchaseRetention, averageRevenuePerCustomer: cohortCustomers.length ? cumulativeRevenue / cohortCustomers.length : null, cumulativeRevenue, cumulativeGrossProfit, cumulativeCacPayback: values[metric] ?? null };
+  });
+  return { cohorts, metric };
+}
+
 export { calculateModel };
