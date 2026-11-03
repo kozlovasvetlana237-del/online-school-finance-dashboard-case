@@ -1,6 +1,6 @@
 import { demoData } from '../data/demo-data.js';
 import { calculateModel, calculateRollingForecast } from './financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix } from './analytics.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js';
 
 export function bootstrap() {
   return demoData;
@@ -155,6 +155,24 @@ export function renderDashboard(model, state = selectedFilters()) {
   const metric = document.getElementById('cohortMetric')?.value || 'revenue';
   const cohortBody = document.getElementById('cohortBody');
   if (cohortBody) cohortBody.innerHTML = calculateCohortMatrix(demoData, metric).cohorts.map((cohort) => { const result = ['activeRetention', 'repeatPurchaseRetention'].includes(metric) ? cohort[metric] : cohort[metric]; return `<tr><td>${cohort.cohortMonth}</td><td>${cohort.newCustomers}</td><td>${cohort.repeatPurchases}</td><td>${cohort.activeRetention === null ? 'н/д' : percent(cohort.activeRetention)}</td><td>${cohort.repeatPurchaseRetention === null ? 'н/д' : percent(cohort.repeatPurchaseRetention)}</td><td>${money(cohort.averageRevenuePerCustomer)}</td><td>${result === null || result === undefined ? 'н/д' : ['activeRetention', 'repeatPurchaseRetention'].includes(metric) ? percent(result) : money(result)}</td></tr>`; }).join('');
+  const horizon = Number(document.getElementById('treasuryHorizon')?.value || 30);
+  const liquidity = calculateLiquidityCalendar(demoData, { startDate: '2026-10-01', horizonDays: horizon, minimumReserve: 1000000 });
+  const cashChart = document.getElementById('cashChart');
+  if (cashChart) { const maxCash = Math.max(...liquidity.days.map((day) => day.closingBalance), 1); cashChart.innerHTML = liquidity.days.filter((_, index) => index % Math.max(1, Math.floor(horizon / 8)) === 0).slice(0, 8).map((day) => `<div class="bar-wrap"><div class="bar ${day.belowReserve ? 'alt' : ''}" style="height:${Math.max(8, day.closingBalance / maxCash * 100)}%"></div><div class="bar-label">${day.date.slice(5)}<br><b>${money(day.closingBalance)}</b></div></div>`).join(''); }
+  bind('treasuryMinimum', money(liquidity.minimumBalance));
+  bind('treasuryReserve', money(1000000));
+  bind('treasuryFreeCash', money(liquidity.freeCash));
+  bind('treasuryGap', liquidity.cashGap ? `есть: ${liquidity.cashGapDates.length} дн.` : 'не выявлен');
+  const treasuryBody = document.getElementById('paymentsBody');
+  if (treasuryBody) treasuryBody.innerHTML = liquidity.days.slice(0, 14).map((day) => `<tr><td>${day.date}</td><td>${money(day.receipts)}</td><td>${money(day.payments)}</td><td>${money(day.closingBalance)}</td><td>${day.belowReserve ? 'кассовый разрыв' : 'в норме'}</td></tr>`).join('');
+  const treasurySignals = document.getElementById('treasurySignals');
+  if (treasurySignals) treasurySignals.innerHTML = `<div class="signal"><div class="icon">₽</div><div><b>Минимальный остаток: ${money(liquidity.minimumBalance)}</b><p>Горизонт: ${horizon} дней. Резерв: ${money(1000000)}. Свободные средства: ${money(liquidity.freeCash)}.</p></div></div><div class="signal"><div class="icon">!</div><div><b>${liquidity.cashGap ? 'Кассовый разрыв выявлен' : 'Кассовый разрыв не выявлен'}</b><p>Основание: проверены все ${horizon} календарных дней.</p></div></div>`;
+  const controlKey = 'umschool_budget_control';
+  const storedControl = loadBudgetControlState(typeof localStorage === 'undefined' ? null : localStorage, controlKey);
+  const controlRows = calculateBudgetControl(demoData.budgetControl).map((record) => ({ ...record, ...storedControl[record.id] }));
+  const controlBody = document.getElementById('budgetControlBody');
+  if (controlBody) controlBody.innerHTML = controlRows.map((record) => { const unit = demoData.businessUnits.find((item) => item.id === record.businessUnitId); return `<tr><td>${unit?.name || record.businessUnitId}</td><td>${record.owner}</td><td><select data-budget-id="${record.id}" data-budget-field="preparationStatus"><option ${record.preparationStatus === 'готово' ? 'selected' : ''}>готово</option><option ${record.preparationStatus === 'в работе' ? 'selected' : ''}>в работе</option></select></td><td><select data-budget-id="${record.id}" data-budget-field="approvalStatus"><option ${record.approvalStatus === 'согласовано' ? 'selected' : ''}>согласовано</option><option ${record.approvalStatus === 'на согласовании' ? 'selected' : ''}>на согласовании</option></select></td><td>${record.plannedDate}</td><td>${record.scheduleStatus}</td><td>${record.correctiveAction}</td></tr>`; }).join('');
+  document.querySelectorAll('[data-budget-id]').forEach((element) => element.addEventListener('change', () => { const state = loadBudgetControlState(localStorage, controlKey); state[element.dataset.budgetId] = { ...(state[element.dataset.budgetId] || {}), [element.dataset.budgetField]: element.value }; saveBudgetControlState(localStorage, controlKey, state); }));
   const badge = document.getElementById('badge');
   if (badge) badge.textContent = `ДЕМО · ${state.period} · единая финансовая модель`;
   const caseBox = document.querySelector('.case-box p');

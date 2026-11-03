@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { demoData } from '../data/demo-data.js';
 import { calculateModel, calculateProfitAndLoss, calculateCashFlow, calculateRollingForecast } from '../js/financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix } from '../js/analytics.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState, resetBudgetControlState } from '../js/analytics.js';
 
 test('financial model has no invalid numbers', () => {
   const model = calculateModel(demoData, { periodIds: ['2026-09'] });
@@ -152,4 +152,32 @@ test('zero new customers produces unavailable CAC and LTV', () => {
   assert.equal(result.cac, null);
   assert.equal(result.ltvGrossProfit, null);
   assert.equal(result.ltvCac, null);
+});
+
+test('liquidity calendar calculates daily balances and horizon', () => {
+  const calendar = calculateLiquidityCalendar(demoData, { startDate: '2026-10-01', horizonDays: 30, minimumReserve: 1000000 });
+  assert.equal(calendar.days.length, 30);
+  assert.equal(calendar.days[0].openingBalance, demoData.openingBalances.cash);
+  assert.equal(calendar.days.at(-1).closingBalance, calendar.days[0].openingBalance + calendar.days.reduce((sum, day) => sum + day.receipts - day.payments, 0));
+});
+
+test('moving a mandatory payment changes liquidity', () => {
+  const before = calculateLiquidityCalendar(demoData, { startDate: '2026-10-01', horizonDays: 30, minimumReserve: 4000000 });
+  const after = calculateLiquidityCalendar(demoData, { startDate: '2026-10-01', horizonDays: 30, minimumReserve: 4000000, payments: demoData.treasuryPayments.map((payment) => payment.id === 'payroll-1' ? { ...payment, date: '2026-10-30' } : payment) });
+  assert.notEqual(before.minimumBalance, after.minimumBalance);
+});
+
+test('budget control detects overdue records', () => {
+  const record = calculateBudgetControl([{ id: '1', plannedDate: '2026-10-01', actualDate: null }], '2026-10-10')[0];
+  assert.equal(record.isOverdue, true);
+  assert.equal(record.delayDays, 9);
+});
+
+test('budget control state saves and resets locally', () => {
+  const state = new Map();
+  const storage = { getItem: (key) => state.get(key) || null, setItem: (key, value) => state.set(key, value), removeItem: (key) => state.delete(key) };
+  saveBudgetControlState(storage, 'test', { a: 'готово' });
+  assert.deepEqual(loadBudgetControlState(storage, 'test'), { a: 'готово' });
+  resetBudgetControlState(storage, 'test');
+  assert.deepEqual(loadBudgetControlState(storage, 'test'), {});
 });

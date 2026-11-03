@@ -145,4 +145,50 @@ export function calculateCohortMatrix(data, metric = 'revenue') {
   return { cohorts, metric };
 }
 
+function dateRange(startDate, horizonDays) {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  return Array.from({ length: horizonDays }, (_, index) => {
+    const date = new Date(start.getTime() + index * 86400000);
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+export function calculateLiquidityCalendar(data, { startDate = '2026-10-01', horizonDays = 30, payments = data.treasuryPayments, minimumReserve = 1000000 } = {}) {
+  const dates = dateRange(startDate, horizonDays);
+  let balance = data.openingBalances.cash;
+  const days = dates.map((date) => {
+    const receipts = data.treasuryReceipts.filter((item) => item.date === date).reduce((sum, item) => sum + item.amount, 0);
+    const paymentTotal = payments.filter((item) => item.date === date).reduce((sum, item) => sum + item.amount, 0);
+    const openingBalance = balance;
+    balance += receipts - paymentTotal;
+    return { date, openingBalance, receipts, payments: paymentTotal, closingBalance: balance, belowReserve: balance < minimumReserve };
+  });
+  const gapDays = days.filter((day) => day.belowReserve);
+  const mandatoryPayments = payments.filter((payment) => payment.mandatory && dates.includes(payment.date)).reduce((sum, payment) => sum + payment.amount, 0);
+  return { days, minimumBalance: Math.min(...days.map((day) => day.closingBalance)), cashGap: gapDays.length > 0, cashGapDates: gapDays.map((day) => day.date), mandatoryPayments, freeCash: Math.max(0, balance - mandatoryPayments - minimumReserve) };
+}
+
+export function calculateBudgetControl(records, now = new Date().toISOString().slice(0, 10)) {
+  return records.map((record) => {
+    const dueDate = new Date(`${record.plannedDate}T00:00:00Z`).getTime();
+    const actualDate = record.actualDate ? new Date(`${record.actualDate}T00:00:00Z`).getTime() : new Date(`${now}T00:00:00Z`).getTime();
+    const delayDays = Math.max(0, Math.round((actualDate - dueDate) / 86400000));
+    return { ...record, delayDays, isOverdue: !record.actualDate && delayDays > 0, scheduleStatus: delayDays > 0 ? 'просрочено' : 'в срок' };
+  });
+}
+
+export function loadBudgetControlState(storage, key = 'umschool_budget_control') {
+  try { return JSON.parse(storage?.getItem(key) || '{}'); } catch (error) { return {}; }
+}
+
+export function saveBudgetControlState(storage, key, state) {
+  try { storage?.setItem(key, JSON.stringify(state)); } catch (error) { return false; }
+  return true;
+}
+
+export function resetBudgetControlState(storage, key = 'umschool_budget_control') {
+  try { storage?.removeItem(key); } catch (error) { return false; }
+  return true;
+}
+
 export { calculateModel };
