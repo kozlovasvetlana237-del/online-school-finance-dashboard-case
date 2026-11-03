@@ -87,6 +87,21 @@ const previousForecast = driverMonths.map(({ periodId, plan }) => ({
   ebitda: plan.leads * plan.conversion / 100 * plan.averageCheck * (1 - plan.refunds) - plan.directCosts - plan.marketing - plan.payroll - plan.admin
 }));
 
+const customers = [];
+const repeatPurchases = [];
+sales.forEach((sale, index) => {
+  const customerId = `demo-customer-${String(index % 180).padStart(3, '0')}`;
+  const firstPaymentMonth = customers.find((customer) => customer.id === customerId)?.firstPaymentMonth || sale.date.slice(0, 7);
+  sale.customerId = customerId;
+  sale.firstPaymentMonth = firstPaymentMonth;
+  sale.isRepeatPurchase = firstPaymentMonth !== sale.date.slice(0, 7);
+  if (!customers.some((customer) => customer.id === customerId)) customers.push({ id: customerId, firstPaymentMonth, productId: sale.productId, channelId: sale.channelId });
+  if (sale.isRepeatPurchase) repeatPurchases.push({ id: `repeat-${sale.id}`, customerId, date: sale.date, productId: sale.productId, amount: sale.paidAmount, refundAmount: sale.refundAmount });
+});
+
+const acquisitionExpenses = periods.map((period) => channels.map((channel, index) => ({ periodId: period.id, channelId: channel.id, productId: products[index % products.length].id, amount: 75000 + index * 25000 }))).flat();
+const directCostsByProduct = { 'core-course': 16000, 'premium-course': 36000, 'additional-course': 6000 };
+
 export const demoData = {
   periods,
   businessUnits,
@@ -106,6 +121,10 @@ export const demoData = {
       refundRateMaximum: 5
     }
   },
+  customers,
+  repeatPurchases,
+  acquisitionExpenses,
+  directCostsByProduct,
   openingBalances: {
     cash: 2500000,
     receivables: 0,

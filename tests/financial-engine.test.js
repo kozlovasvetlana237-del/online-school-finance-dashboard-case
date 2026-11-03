@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { demoData } from '../data/demo-data.js';
 import { calculateModel, calculateProfitAndLoss, calculateCashFlow, calculateRollingForecast } from '../js/financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals } from '../js/analytics.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix } from '../js/analytics.js';
 
 test('financial model has no invalid numbers', () => {
   const model = calculateModel(demoData, { periodIds: ['2026-09'] });
@@ -130,4 +130,26 @@ test('signals do not invent a cause', () => {
   });
   assert.equal(signals.some((signal) => signal.status === 'требует анализа'), true);
   assert.equal(signals.some((signal) => signal.cause === 'подтверждено план-факт данными'), true);
+});
+
+test('unit economics calculates CAC from acquisition costs and new customers', () => {
+  const result = calculateUnitEconomics(demoData, { productId: 'core-course' })[0];
+  const acquisition = demoData.acquisitionExpenses.filter((item) => item.productId === 'core-course').reduce((sum, item) => sum + item.amount, 0);
+  assert.equal(result.cac, acquisition / result.newCustomers);
+  assert.equal(result.ltvCac, result.ltvGrossProfit / result.cac);
+});
+
+test('cohort matrix keeps active and repeat retention separate', () => {
+  const matrix = calculateCohortMatrix(demoData, 'activeRetention');
+  assert.ok(matrix.cohorts.length > 0);
+  assert.ok(matrix.cohorts.every((cohort) => cohort.activeRetention === null || Number.isFinite(cohort.activeRetention)));
+  assert.ok(matrix.cohorts.some((cohort) => cohort.repeatPurchaseRetention !== cohort.activeRetention));
+});
+
+test('zero new customers produces unavailable CAC and LTV', () => {
+  const data = { ...demoData, sales: [], customers: [], repeatPurchases: [] };
+  const result = calculateUnitEconomics(data, { productId: 'core-course' })[0];
+  assert.equal(result.cac, null);
+  assert.equal(result.ltvGrossProfit, null);
+  assert.equal(result.ltvCac, null);
 });
