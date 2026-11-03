@@ -1,0 +1,8 @@
+{
+  "name": "online-school-finance-dashboard-case",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

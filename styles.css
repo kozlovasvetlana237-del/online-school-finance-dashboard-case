@@ -1,0 +1,16 @@
+/* The existing visual system remains inline for GitHub Pages compatibility. */
+:root {
+  color-scheme: dark light;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent2, #46c2ff);
+  outline-offset: 2px;
+}
+
+.model-hint,
+.footer-note {
+  max-width: 100ch;
+}
