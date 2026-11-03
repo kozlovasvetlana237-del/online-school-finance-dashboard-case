@@ -43,6 +43,35 @@ function renderTable(id, rows) {
   body.innerHTML = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('');
 }
 
+function applyTheme(theme) {
+  document.body.setAttribute('data-theme', theme);
+  const label = document.getElementById('themeLabel');
+  const icon = document.getElementById('themeIcon');
+  if (theme === 'light') {
+    if (label) label.textContent = 'Тёмная тема';
+    if (icon) icon.textContent = '🌙';
+  } else {
+    if (label) label.textContent = 'Светлая тема';
+    if (icon) icon.textContent = '☀️';
+  }
+  try { localStorage.setItem('umschool_demo_theme', theme); } catch (error) { /* localStorage may be unavailable */ }
+}
+
+function initNavigation() {
+  const tabs = document.querySelectorAll('.nav button[data-tab]');
+  const sections = document.querySelectorAll('.tab');
+  tabs.forEach((button) => button.addEventListener('click', () => {
+    tabs.forEach((item) => item.classList.toggle('active', item === button));
+    sections.forEach((section) => section.classList.toggle('active', section.id === button.dataset.tab));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }));
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) themeToggle.addEventListener('click', () => applyTheme(document.body.dataset.theme === 'light' ? 'dark' : 'light'));
+  let savedTheme = 'dark';
+  try { savedTheme = localStorage.getItem('umschool_demo_theme') || 'dark'; } catch (error) { /* localStorage may be unavailable */ }
+  applyTheme(savedTheme);
+}
+
 export function renderDashboard(model, state = selectedFilters()) {
   const pl = model.profitAndLoss;
   const cf = model.cashFlow;
@@ -137,7 +166,12 @@ if (typeof document !== 'undefined') {
     const state = selectedFilters();
     renderDashboard(calculateModel(demoData, state), state);
   };
-  document.addEventListener('DOMContentLoaded', update, { once: true });
-  document.querySelectorAll('select').forEach((element) => element.addEventListener('change', update));
-  document.getElementById('cohortMetric')?.addEventListener('change', update);
+  const init = () => {
+    initNavigation();
+    update();
+    document.querySelectorAll('select').forEach((element) => element.addEventListener('change', update));
+    document.getElementById('cohortMetric')?.addEventListener('change', update);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 }
