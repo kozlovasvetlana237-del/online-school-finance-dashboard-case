@@ -1,6 +1,6 @@
 import { demoData } from '../data/demo-data.js';
-import { calculateModel } from './financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks } from './analytics.js';
+import { calculateModel, calculateRollingForecast } from './financial-engine.js';
+import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals } from './analytics.js';
 
 export function bootstrap() {
   return demoData;
@@ -51,6 +51,17 @@ export function renderDashboard(model, state = selectedFilters()) {
   const margin = pl.revenue === 0 ? null : pl.ebitda / pl.revenue * 100;
   const budgetPlan = demoData.budgets.filter((item) => state.periodIds.includes(item.periodId) && item.category === 'Выручка').reduce((sum, item) => sum + item.amount, 0);
   const budget = calculateBudgetVariance(budgetPlan, pl.revenue);
+  const driverMonth = demoData.drivers.months.find((month) => month.periodId === state.periodIds[state.periodIds.length - 1]) || demoData.drivers.months[0];
+  const revenueBridge = calculateRevenueBridge(driverMonth.plan, driverMonth.actual);
+  const toPl = (drivers) => {
+    const revenue = drivers.leads * drivers.conversion / 100 * drivers.averageCheck * (1 - drivers.refunds);
+    const costOfSales = drivers.directCosts;
+    const ebitda = revenue - costOfSales - drivers.marketing - drivers.payroll - drivers.admin;
+    return { revenue, costOfSales, marketing: drivers.marketing, sales: 0, payroll: drivers.payroll, admin: drivers.admin, ebitda };
+  };
+  const ebitdaBridge = calculateEbitdaBridge(toPl(driverMonth.plan), toPl(driverMonth.actual));
+  const forecast = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: 'base' });
+  const signals = buildFinancialSignals({ planFact: { marketing: calculateBudgetVariance(driverMonth.plan.marketing, driverMonth.actual.marketing, 'expense') }, forecast, model, thresholds: demoData.drivers.thresholds });
 
   bind('rev', money(pl.revenue));
   bind('ebitda', money(pl.ebitda));
@@ -100,6 +111,16 @@ export function renderDashboard(model, state = selectedFilters()) {
     ['ФОТ', money(0), money(pl.payroll), money(pl.payroll), 'н/д'],
     ['EBITDA', money(0), money(pl.ebitda), money(pl.ebitda), 'н/д']
   ]);
+  const bridge = document.getElementById('varianceWaterfall');
+  if (bridge) bridge.innerHTML = `<div class="signal"><div class="icon">Δ</div><div><b>Мост выручки: ${money(revenueBridge.totalVariance)}</b><p>Метод: последовательные подстановки. ${revenueBridge.factors.map((factor) => `${factor.label}: ${factor.impact >= 0 ? '+' : '−'}${money(Math.abs(factor.impact))}`).join(' · ')}</p></div></div><div class="signal"><div class="icon">E</div><div><b>Мост EBITDA: ${money(ebitdaBridge.totalVariance)}</b><p>Сумма факторов: ${money(ebitdaBridge.sumOfImpacts)}. Расхождение: ${money(ebitdaBridge.sumOfImpacts - ebitdaBridge.totalVariance)}.</p></div></div>`;
+  const forecastChart = document.getElementById('forecastChart');
+  if (forecastChart) forecastChart.innerHTML = forecast.months.map((month) => `<div class="bar-wrap"><div class="bar ${month.status === 'forecast' ? 'alt' : ''}" style="height:${Math.max(8, month.revenue / Math.max(...forecast.months.map((item) => item.revenue)) * 100)}%"></div><div class="bar-label">${month.periodId.slice(5)}<br><b>${money(month.revenue)}</b></div></div>`).join('');
+  const scenarioBody = document.getElementById('scenarioBody');
+  if (scenarioBody) scenarioBody.innerHTML = ['base', 'optimistic', 'conservative'].map((scenario) => { const result = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario }); return `<tr><td>${scenario === 'base' ? 'Базовый' : scenario === 'optimistic' ? 'Оптимистичный' : 'Консервативный'}</td><td>${money(result.annual.revenue)}</td><td>${money(result.annual.ebitda)}</td><td>${money(result.annual.cashFlow)}</td><td>сценарный диапазон</td></tr>`; }).join('');
+  const signalBox = document.getElementById('overviewSignals');
+  if (signalBox) signalBox.innerHTML = (signals.length ? signals : [{ title: 'Критичных сигналов нет', problem: 'Пороговые правила не сработали', basis: 'по выбранному периоду', cause: 'данных для риска нет', consequence: 'не выявлено', action: 'продолжить мониторинг', owner: 'финансовый руководитель', status: 'наблюдение' }]).map((signal) => `<div class="signal"><div class="icon">!</div><div><b>${signal.title}</b><p>${signal.problem}. Основание: ${signal.basis}. Причина: ${signal.cause}. Действие: ${signal.action}. Ответственный: ${signal.owner}. Статус: ${signal.status}.</p></div></div>`).join('');
+  const probabilityCard = document.querySelector('[data-bind="planProbability"]')?.closest('.card');
+  if (probabilityCard) probabilityCard.style.display = 'none';
   const badge = document.getElementById('badge');
   if (badge) badge.textContent = `ДЕМО · ${state.period} · единая финансовая модель`;
   const caseBox = document.querySelector('.case-box p');

@@ -16,6 +16,43 @@ export function calculateBudgetVariance(plan, actual, kind = 'income') {
   return { plan, actual, absolute, relative, favorable };
 }
 
+function driverRevenue(drivers) {
+  return drivers.leads * drivers.conversion / 100 * drivers.averageCheck * (1 - drivers.refunds);
+}
+
+export function calculateRevenueBridge(planDrivers, actualDrivers) {
+  const keys = [
+    ['leads', 'Лиды'],
+    ['conversion', 'Конверсия'],
+    ['averageCheck', 'Средний чек'],
+    ['refunds', 'Возвраты']
+  ];
+  const base = { ...planDrivers };
+  const planRevenue = driverRevenue(base);
+  let previous = planRevenue;
+  const factors = keys.map(([key, label]) => {
+    const next = { ...base, [key]: actualDrivers[key] };
+    const value = driverRevenue(next);
+    const impact = value - previous;
+    base[key] = actualDrivers[key];
+    previous = value;
+    return { key, label, impact, method: 'sequential_substitution' };
+  });
+  return { planRevenue, actualRevenue: previous, totalVariance: previous - planRevenue, factors, method: 'sequential_substitution' };
+}
+
+export function calculateEbitdaBridge(planPl, actualPl) {
+  const factors = [
+    { key: 'revenue', label: 'Отклонение признанной выручки', impact: actualPl.revenue - planPl.revenue },
+    { key: 'costOfSales', label: 'Отклонение себестоимости', impact: -(actualPl.costOfSales - planPl.costOfSales) },
+    { key: 'marketing', label: 'Отклонение маркетинга', impact: -(actualPl.marketing - planPl.marketing) },
+    { key: 'payroll', label: 'Отклонение ФОТ', impact: -(actualPl.payroll - planPl.payroll) },
+    { key: 'otherOperating', label: 'Отклонение прочих расходов', impact: -((actualPl.sales + actualPl.admin) - (planPl.sales + planPl.admin)) }
+  ];
+  const totalVariance = actualPl.ebitda - planPl.ebitda;
+  return { totalVariance, factors, sumOfImpacts: factors.reduce((sum, factor) => sum + factor.impact, 0) };
+}
+
 export function calculateAnnualForecast(periodResults, closedPeriodIds) {
   const closed = periodResults.filter((item) => closedPeriodIds.includes(item.periodId));
   const remaining = periodResults.filter((item) => !closedPeriodIds.includes(item.periodId));
@@ -38,6 +75,22 @@ export function calculateControlChecks(model) {
     noInvalidNumbers: Object.values({ ...pl, ...cf, ...bs }).every(Number.isFinite)
   };
   return { ...checks, allPassed: Object.values(checks).every((value) => value === true || value === 0) };
+}
+
+export function buildFinancialSignals({ planFact, forecast, model, thresholds }) {
+  const signals = [];
+  const marketing = planFact?.marketing;
+  if (marketing && marketing.relative !== null && marketing.relative > thresholds.marketingOverrunPercent) {
+    signals.push({ id: 'marketing-overrun', title: 'Превышение бюджета маркетинга', problem: 'Факт маркетинга выше плана', basis: `${marketing.relative.toFixed(1)}%`, cause: 'подтверждено план-факт данными', consequence: 'снижение EBITDA', action: 'проверить кампании и перераспределить бюджет', owner: 'руководитель маркетинга', status: 'к действию', severity: 'warning' });
+  }
+  const margin = model?.profitAndLoss?.revenue ? model.profitAndLoss.ebitda / model.profitAndLoss.revenue * 100 : null;
+  if (margin !== null && margin < thresholds.ebitdaMarginMinimum) {
+    signals.push({ id: 'margin-risk', title: 'Низкая EBITDA margin', problem: 'Маржинальность ниже порога', basis: `${margin.toFixed(1)}%`, cause: 'недостаточно данных для детализации причины', consequence: 'снижение запаса финансовой устойчивости', action: 'провести анализ себестоимости и расходов', owner: 'финансовый руководитель', status: 'требует анализа', severity: 'bad' });
+  }
+  if (forecast?.shortfallPercent > thresholds.forecastShortfallPercent) {
+    signals.push({ id: 'forecast-shortfall', title: 'Риск недовыполнения прогноза', problem: 'Прогноз ниже утверждённого бюджета', basis: `${forecast.shortfallPercent.toFixed(1)}%`, cause: forecast.cause || 'недостаточно данных для детализации причины', consequence: 'недополучение выручки', action: 'обновить драйверы продаж и план действий', owner: 'руководитель продаж', status: forecast.cause ? 'к действию' : 'требует анализа', severity: 'bad' });
+  }
+  return signals;
 }
 
 export { calculateModel };

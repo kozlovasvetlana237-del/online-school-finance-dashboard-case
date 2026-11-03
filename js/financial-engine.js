@@ -104,3 +104,25 @@ export function calculateModel(data, filters = {}) {
   const balanceSheet = calculateBalanceSheet(data, filters);
   return { profitAndLoss, cashFlow, balanceSheet, recognizedRevenue: profitAndLoss.revenue, deferredRevenue: balanceSheet.deferredRevenue, periodResults: [] };
 }
+
+function scenarioDrivers(drivers, scenario, customDrivers = {}) {
+  const factor = scenario === 'optimistic' ? { leads: 1.08, conversion: 1.08, averageCheck: 1.03 } : scenario === 'conservative' ? { leads: 0.92, conversion: 0.94, averageCheck: 0.98 } : { leads: 1, conversion: 1, averageCheck: 1 };
+  const source = scenario === 'custom' ? { ...drivers, ...customDrivers } : drivers;
+  return { ...source, leads: source.leads * factor.leads, conversion: source.conversion * factor.conversion, averageCheck: source.averageCheck * factor.averageCheck };
+}
+
+export function calculateRollingForecast(data, { lastClosedPeriodId = '2026-09', scenario = 'base', customDrivers = {} } = {}) {
+  const months = data.drivers.months.map((month) => {
+    const isFact = month.periodId <= lastClosedPeriodId;
+    const source = isFact ? month.actual : scenarioDrivers(month.forecast, scenario, customDrivers);
+    const revenue = source.leads * source.conversion / 100 * source.averageCheck * (1 - source.refunds);
+    const ebitda = revenue - source.directCosts - source.marketing - source.payroll - source.admin;
+    const budgetRevenue = month.plan.leads * month.plan.conversion / 100 * month.plan.averageCheck * (1 - month.plan.refunds);
+    const previous = data.drivers.previousForecast.find((item) => item.periodId === month.periodId);
+    return { periodId: month.periodId, status: isFact ? 'fact' : 'forecast', revenue, ebitda, cashFlow: revenue - source.marketing - source.directCosts - source.payroll - source.admin, budgetRevenue, previousForecastRevenue: previous?.revenue ?? null };
+  });
+  const sum = (key) => months.reduce((total, month) => total + month[key], 0);
+  const budget = sum('budgetRevenue');
+  const revenue = sum('revenue');
+  return { months, annual: { revenue, ebitda: sum('ebitda'), cashFlow: sum('cashFlow') }, shortfallPercent: budget === 0 ? 0 : Math.max(0, (budget - revenue) / budget * 100) };
+}
