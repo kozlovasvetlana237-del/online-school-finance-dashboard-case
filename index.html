@@ -322,6 +322,7 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
       <button data-tab="drivers">Финмодель и метрики</button>
       <button data-tab="unit-cohorts">Юнит-экономика и когорты</button>
       <button data-tab="treasury">Казначейство</button>
+      <button data-tab="budget-control">Бюджетный контроль</button>
       <button data-tab="quality">Контроль данных</button>
     </nav>
   </div>
@@ -566,16 +567,16 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
   <section id="treasury" class="tab">
     <div class="grid row2">
       <div class="card">
-        <div class="section-title"><h2>Денежный прогноз на 8 недель</h2><span>ликвидность</span></div>
+        <div class="section-title"><h2>Денежный прогноз</h2><select id="treasuryHorizon"><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option></select></div>
         <div class="chart" id="cashChart"></div>
       </div>
       <div class="card">
         <div class="section-title"><h2>Казначейство</h2><span>свободные деньги и размещение</span></div>
         <div class="metric-list">
-          <div class="metric-line"><span>Свободный остаток</span><b data-bind="freeCash"></b></div>
-          <div class="metric-line"><span>Резервный фонд</span><b data-bind="reserveFund"></b></div>
-          <div class="metric-line"><span>Сумма к размещению</span><b class="good" data-bind="toPlacement"></b></div>
-          <div class="metric-line"><span>Ожидаемый доход от размещения</span><b class="good" data-bind="placementIncome"></b></div>
+          <div class="metric-line"><span>Минимальный прогнозный остаток</span><b data-bind="treasuryMinimum"></b></div>
+          <div class="metric-line"><span>Минимальный резерв</span><b data-bind="treasuryReserve"></b></div>
+          <div class="metric-line"><span>Свободные средства после обязательных платежей</span><b class="good" data-bind="treasuryFreeCash"></b></div>
+          <div class="metric-line"><span>Кассовый разрыв</span><b data-bind="treasuryGap"></b></div>
         </div>
       </div>
     </div>
@@ -584,7 +585,7 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
         <div class="section-title"><h2>Платежный календарь</h2><span>текущая неделя</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Статья</th><th>Сумма</th><th>Приоритет</th><th>Статус</th></tr></thead>
+            <thead><tr><th>Дата</th><th>Поступления</th><th>Платежи</th><th>Конечный остаток</th><th>Статус</th></tr></thead>
             <tbody id="paymentsBody"></tbody>
           </table>
         </div>
@@ -593,6 +594,14 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
         <div class="section-title"><h2>Риски ликвидности</h2><span>наблюдение</span></div>
         <div id="treasurySignals"></div>
       </div>
+    </div>
+  </section>
+
+  <section id="budget-control" class="tab">
+    <div class="card">
+      <div class="section-title"><h2>Бюджетный контроль</h2><span>локальный демонстрационный режим</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Бизнес-юнит</th><th>Ответственный</th><th>Подготовка</th><th>Согласование</th><th>Срок</th><th>Статус</th><th>Мероприятие</th></tr></thead><tbody id="budgetControlBody"></tbody></table></div>
+      <div class="footer-note">Статусы сохраняются только в localStorage браузера и не являются корпоративным workflow.</div>
     </div>
   </section>
 
