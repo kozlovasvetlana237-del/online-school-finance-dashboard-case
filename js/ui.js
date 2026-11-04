@@ -1,7 +1,7 @@
-import { demoData } from '../data/demo-data.js';
-import { calculateModel, calculateRollingForecast } from './financial-engine.js';
-import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js';
-import { applyPaymentDateOverride, loadLocalState, nextTheme, readCustomDrivers, readFilterState, saveLocalState } from './ui-state.js';
+import { demoData } from '../data/demo-data.js?v=20261104-final';
+import { calculateModel, calculateRollingForecast } from './financial-engine.js?v=20261104-final';
+import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js?v=20261104-final';
+import { applyPaymentDateOverride, loadLocalState, nextTheme, readCustomDrivers, readFilterState, saveLocalState } from './ui-state.js?v=20261104-final';
 
 export function bootstrap() {
   return demoData;
