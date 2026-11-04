@@ -296,12 +296,29 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
             <option>Базовый сценарий</option>
             <option>Оптимистичный сценарий</option>
             <option>Консервативный сценарий</option>
+            <option>Пользовательский сценарий</option>
+          </select>
+          <select id="comparisonPeriod" aria-label="Период сравнения">
+            <option>Предыдущий период</option>
+            <option>3 квартал 2025</option>
+            <option>2025 YTD</option>
+          </select>
+          <select id="viewMode" aria-label="Режим данных">
+            <option>Факт</option>
+            <option>План</option>
+            <option>Прогноз</option>
           </select>
           <select id="segment">
             <option>ГК</option>
             <option>Основные курсы</option>
             <option>Премиум-программы</option>
             <option>Дополнительные продукты</option>
+          </select>
+          <select id="product" aria-label="Образовательный продукт">
+            <option value="all">Все продукты</option>
+            <option value="core-course">Основная программа</option>
+            <option value="premium-course">Премиум-программа</option>
+            <option value="additional-course">Дополнительный модуль</option>
           </select>
           <select id="unit">
             <option>Все подразделения</option>
@@ -344,6 +361,9 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
       <div class="card kpi"><div class="label">Средний чек</div><div class="value" data-bind="avgCheck"></div><div class="delta good">рост по сравнению с прошлым периодом</div></div>
       <div class="card kpi"><div class="label">Конверсия в оплату</div><div class="value" data-bind="conversion"></div><div class="delta">по воронке продаж</div></div>
       <div class="card kpi"><div class="label">Свободные денежные средства</div><div class="value" data-bind="freeCash"></div><div class="delta good">доступны к размещению</div></div>
+      <div class="card kpi"><div class="label">CAC</div><div class="value" data-bind="cac"></div><div class="delta">расходы на привлечение / новые клиенты</div></div>
+      <div class="card kpi"><div class="label">LTV/CAC</div><div class="value" data-bind="ltvCac"></div><div class="delta">по накопительной валовой прибыли</div></div>
+      <div class="card kpi"><div class="label">Доля возвратов</div><div class="value" data-bind="refundRate"></div><div class="delta">возвраты / валовая выручка</div></div>
     </div>
 
     <div class="grid row2">
@@ -544,6 +564,10 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
           <div class="model-result"><span>Операционная прибыль</span><b id="fmEbitdaResult">0</b></div>
           <div class="model-result"><span>Операционная рентабельность</span><b id="fmMarginResult">0%</b></div>
         </div>
+        <div class="model-actions">
+          <button type="button" id="saveCustomScenario">Сохранить сценарий</button>
+          <button type="button" id="resetCustomScenario">Сбросить к демо-данным</button>
+        </div>
         <div class="model-hint">Расчет: лиды × конверсия = оплаты; оплаты × средний чек = выручка; операционная прибыль = выручка минус маркетинг, ФОТ и прочие операционные расходы.</div>
       </div>
     </div>
@@ -572,6 +596,8 @@ body[data-theme="light"] .status-schedule{color:#5d47db;background:#f0ecff;borde
       </div>
       <div class="card">
         <div class="section-title"><h2>Казначейство</h2><span>свободные деньги и размещение</span></div>
+        <label class="footer-note" for="treasuryPaymentDate">Дата условного платежа ФОТ</label>
+        <input id="treasuryPaymentDate" type="date" value="2026-10-05" />
         <div class="metric-list">
           <div class="metric-line"><span>Минимальный прогнозный остаток</span><b data-bind="treasuryMinimum"></b></div>
           <div class="metric-line"><span>Минимальный резерв</span><b data-bind="treasuryReserve"></b></div>
@@ -1005,3 +1031,4 @@ update();
 <script type="module" src="./js/ui.js"></script>
 </body>
 </html>
+

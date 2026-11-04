@@ -6,7 +6,7 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
 
 test('index exposes the required global controls', () => {
-  for (const id of ['period', 'scenario', 'segment', 'unit', 'themeToggle', 'cohortMetric', 'treasuryHorizon']) {
+  for (const id of ['period', 'scenario', 'comparisonPeriod', 'viewMode', 'segment', 'product', 'unit', 'themeToggle', 'cohortMetric', 'treasuryHorizon', 'treasuryPaymentDate', 'saveCustomScenario', 'resetCustomScenario']) {
     assert.ok(html.includes('id="' + id + '"') || html.includes("id='" + id + "'"), 'missing control ' + id);
   }
 });
