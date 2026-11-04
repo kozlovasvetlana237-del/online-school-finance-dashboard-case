@@ -1,16 +1,11 @@
 import { demoData } from '../data/demo-data.js';
 import { calculateModel, calculateRollingForecast } from './financial-engine.js';
 import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js';
+import { nextTheme, readFilterState } from './ui-state.js';
 
 export function bootstrap() {
   return demoData;
 }
-
-const periodMap = {
-  'Сентябрь 2026': ['2026-09'],
-  '3 квартал 2026': ['2026-07', '2026-08', '2026-09'],
-  '2026 YTD': demoData.periods.filter((period) => period.id.startsWith('2026-')).map((period) => period.id)
-};
 
 function money(value, digits = 1) {
   if (!Number.isFinite(value)) return 'н/д';
@@ -27,14 +22,12 @@ function bind(key, value) {
 }
 
 function selectedFilters() {
-  const period = document.getElementById('period')?.value || 'Сентябрь 2026';
-  const segment = document.getElementById('segment')?.value || 'ГК';
-  const businessUnitId = segment === 'ГК' ? undefined : {
-    'Основные курсы': 'core',
-    'Премиум-программы': 'premium',
-    'Дополнительные продукты': 'additional'
-  }[segment];
-  return { period, periodIds: periodMap[period], businessUnitId };
+  return readFilterState({
+    period: document.getElementById('period'),
+    scenario: document.getElementById('scenario'),
+    segment: document.getElementById('segment'),
+    unit: document.getElementById('unit')
+  }, demoData);
 }
 
 function renderTable(id, rows) {
@@ -66,7 +59,7 @@ function initNavigation() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }));
   const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) themeToggle.addEventListener('click', () => applyTheme(document.body.dataset.theme === 'light' ? 'dark' : 'light'));
+  if (themeToggle) themeToggle.addEventListener('click', () => applyTheme(nextTheme(document.body.dataset.theme)));
   let savedTheme = 'dark';
   try { savedTheme = localStorage.getItem('umschool_demo_theme') || 'dark'; } catch (error) { /* localStorage may be unavailable */ }
   applyTheme(savedTheme);
@@ -89,7 +82,7 @@ export function renderDashboard(model, state = selectedFilters()) {
     return { revenue, costOfSales, marketing: drivers.marketing, sales: 0, payroll: drivers.payroll, admin: drivers.admin, ebitda };
   };
   const ebitdaBridge = calculateEbitdaBridge(toPl(driverMonth.plan), toPl(driverMonth.actual));
-  const forecast = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: 'base' });
+  const forecast = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: state.scenario });
   const signals = buildFinancialSignals({ planFact: { marketing: calculateBudgetVariance(driverMonth.plan.marketing, driverMonth.actual.marketing, 'expense') }, forecast, model, thresholds: demoData.drivers.thresholds });
 
   bind('rev', money(pl.revenue));
@@ -145,7 +138,7 @@ export function renderDashboard(model, state = selectedFilters()) {
   const forecastChart = document.getElementById('forecastChart');
   if (forecastChart) forecastChart.innerHTML = forecast.months.map((month) => `<div class="bar-wrap"><div class="bar ${month.status === 'forecast' ? 'alt' : ''}" style="height:${Math.max(8, month.revenue / Math.max(...forecast.months.map((item) => item.revenue)) * 100)}%"></div><div class="bar-label">${month.periodId.slice(5)}<br><b>${money(month.revenue)}</b></div></div>`).join('');
   const scenarioBody = document.getElementById('scenarioBody');
-  if (scenarioBody) scenarioBody.innerHTML = ['base', 'optimistic', 'conservative'].map((scenario) => { const result = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario }); return `<tr><td>${scenario === 'base' ? 'Базовый' : scenario === 'optimistic' ? 'Оптимистичный' : 'Консервативный'}</td><td>${money(result.annual.revenue)}</td><td>${money(result.annual.ebitda)}</td><td>${money(result.annual.cashFlow)}</td><td>сценарный диапазон</td></tr>`; }).join('');
+  if (scenarioBody) scenarioBody.innerHTML = ['base', 'optimistic', 'conservative'].map((scenario) => { const result = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario }); return `<tr><td>${scenario === 'base' ? 'Базовый' : scenario === 'optimistic' ? 'Оптимистичный' : 'Консервативный'}</td><td>${money(result.annual.revenue)}</td><td>${money(result.annual.ebitda)}</td><td>${money(result.annual.cashFlow)}</td><td>${scenario === state.scenario ? 'выбранный сценарий' : 'сценарный диапазон'}</td></tr>`; }).join('');
   const signalBox = document.getElementById('overviewSignals');
   if (signalBox) signalBox.innerHTML = (signals.length ? signals : [{ title: 'Критичных сигналов нет', problem: 'Пороговые правила не сработали', basis: 'по выбранному периоду', cause: 'данных для риска нет', consequence: 'не выявлено', action: 'продолжить мониторинг', owner: 'финансовый руководитель', status: 'наблюдение' }]).map((signal) => `<div class="signal"><div class="icon">!</div><div><b>${signal.title}</b><p>${signal.problem}. Основание: ${signal.basis}. Причина: ${signal.cause}. Действие: ${signal.action}. Ответственный: ${signal.owner}. Статус: ${signal.status}.</p></div></div>`).join('');
   const probabilityCard = document.querySelector('[data-bind="planProbability"]')?.closest('.card');
@@ -193,3 +186,4 @@ if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 }
+
