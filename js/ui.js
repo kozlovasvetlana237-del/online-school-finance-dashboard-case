@@ -1,5 +1,5 @@
 import { demoData } from '../data/demo-data.js?v=20261104-final';
-import { calculateModel, calculateRollingForecast } from './financial-engine.js?v=20261104-final';
+import { calculateManagementView, calculateModel, calculateRollingForecast } from './financial-engine.js?v=20261104-final';
 import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js?v=20261104-final';
 import { applyPaymentDateOverride, loadLocalState, nextTheme, readCustomDrivers, readFilterState, saveLocalState } from './ui-state.js?v=20261104-final';
 
@@ -82,13 +82,16 @@ function initNavigation() {
 }
 
 export function renderDashboard(model, state = selectedFilters()) {
-  const pl = model.profitAndLoss;
-  const cf = model.cashFlow;
-  const bs = model.balanceSheet;
+  const viewModel = calculateManagementView(demoData, state, { mode: state.viewMode, scenario: state.scenario });
+  const pl = viewModel.profitAndLoss;
+  const cf = viewModel.cashFlow;
+  const bs = viewModel.balanceSheet;
   const checks = calculateControlChecks(model);
   const margin = pl.revenue === 0 ? null : pl.ebitda / pl.revenue * 100;
   const budgetPlan = demoData.budgets.filter((item) => state.periodIds.includes(item.periodId) && item.category === 'Выручка').reduce((sum, item) => sum + item.amount, 0);
   const budget = calculateBudgetVariance(budgetPlan, pl.revenue);
+  const comparisonModel = calculateModel(demoData, { ...state, periodIds: state.comparisonPeriodIds });
+  const revenueTrend = comparisonModel.profitAndLoss.revenue === 0 ? null : (pl.revenue - comparisonModel.profitAndLoss.revenue) / Math.abs(comparisonModel.profitAndLoss.revenue) * 100;
   const driverMonth = demoData.drivers.months.find((month) => month.periodId === state.periodIds[state.periodIds.length - 1]) || demoData.drivers.months[0];
   const customStorage = typeof localStorage === 'undefined' ? null : localStorage;
   const savedCustom = loadLocalState(customStorage, 'umschool_custom_scenario', {});
@@ -123,6 +126,7 @@ export function renderDashboard(model, state = selectedFilters()) {
   bind('ocf', money(cf.operating));
   bind('budgetExec', budgetPlan === 0 ? 'н/д' : percent(pl.revenue / budgetPlan * 100));
   bind('budgetExecDelta', budget.relative === null ? 'н/д' : `${budget.absolute >= 0 ? '+' : ''}${money(budget.absolute)}`);
+  bind('revenueTrend', revenueTrend === null ? 'н/д к сравнению' : `${revenueTrend >= 0 ? '+' : ''}${percent(revenueTrend)} к сравнению`);
   bind('yearForecast', money(pl.revenue));
   bind('freeCash', money(cf.closingCash));
   const unitMetrics = calculateUnitEconomics(demoData, { productId: state.productId === 'all' ? undefined : state.productId });
@@ -136,7 +140,7 @@ export function renderDashboard(model, state = selectedFilters()) {
   bind('actualRevenue', money(pl.revenue));
   bind('budgetRevenue', money(budgetPlan));
   bind('budgetVariance', budget.relative === null ? 'н/д' : `${budget.absolute >= 0 ? '+' : '−'}${money(Math.abs(budget.absolute))}`);
-  bind('overviewScope', `${state.period} · единая модель`);
+  bind('overviewScope', `${state.period} · ${state.viewMode.toLowerCase()} · сравнение: ${state.comparisonPeriod}`);
 
   renderTable('plBody', [
     ['Выручка', money(pl.revenue), percent(pl.revenue ? 100 : null)],
@@ -163,7 +167,7 @@ export function renderDashboard(model, state = selectedFilters()) {
     ['Основные средства и НМА', money(bs.fixedAssets), 'актив'],
     ['Предоплаты клиентов', money(bs.deferredRevenue), 'обязательство'],
     ['Собственный капитал', money(bs.equity), 'капитал'],
-    ['Контроль: активы - обязательства - капитал', money(bs.balanceCheck), checks.balance === 0 ? 'OK' : 'ошибка']
+    ['Контроль: активы - обязательства - капитал', money(bs.balanceCheck), state.viewMode === 'Факт' ? (checks.balance === 0 ? 'OK' : 'ошибка') : 'н/д для режима']
   ]);
   renderTable('planFactBody', [
     ['Выручка', money(budget.plan), money(budget.actual), money(budget.absolute), budget.relative === null ? 'н/д' : percent(budget.relative)],
