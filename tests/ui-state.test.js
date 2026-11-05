@@ -24,6 +24,7 @@ test('readFilterState maps selected period and segment', () => {
   assert.equal(state.unit, 'Продажи');
   assert.equal(state.productId, 'premium-course');
   assert.equal(state.comparisonPeriod, '3 квартал 2025');
+  assert.deepEqual(state.comparisonPeriodIds, ['2025-07', '2025-08', '2025-09']);
   assert.equal(state.viewMode, 'Прогноз');
 });
 
