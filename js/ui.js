@@ -1,7 +1,7 @@
-import { demoData } from '../data/demo-data.js?v=20261104-final';
-import { calculateManagementView, calculateModel, calculateRollingForecast } from './financial-engine.js?v=20261104-final';
-import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js?v=20261104-final';
-import { applyPaymentDateOverride, loadLocalState, nextTheme, readCustomDrivers, readFilterState, saveLocalState } from './ui-state.js?v=20261104-final';
+import { demoData } from '../data/demo-data.js?v=20261105-filter';
+import { calculateManagementView, calculateModel, calculateRollingForecast } from './financial-engine.js?v=20261105-filter';
+import { calculateBudgetVariance, calculateControlChecks, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState } from './analytics.js?v=20261105-filter';
+import { applyPaymentDateOverride, loadLocalState, nextTheme, readCustomDrivers, readFilterState, saveLocalState } from './ui-state.js?v=20261105-filter';
 
 export function bootstrap() {
   return demoData;
@@ -250,13 +250,18 @@ if (typeof document !== 'undefined') {
     const state = selectedFilters();
     renderDashboard(calculateModel(demoData, state), state);
   };
+  let updateTimer;
+  const scheduleUpdate = () => {
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(update, 0);
+  };
   const init = () => {
     initNavigation();
     initCustomScenarioControls();
     update();
-    document.querySelectorAll('select').forEach((element) => element.addEventListener('change', update));
-    document.getElementById('cohortMetric')?.addEventListener('change', update);
-    document.getElementById('treasuryPaymentDate')?.addEventListener('change', update);
+    document.querySelectorAll('select').forEach((element) => element.addEventListener('change', scheduleUpdate));
+    document.getElementById('cohortMetric')?.addEventListener('change', scheduleUpdate);
+    document.getElementById('treasuryPaymentDate')?.addEventListener('change', scheduleUpdate);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
