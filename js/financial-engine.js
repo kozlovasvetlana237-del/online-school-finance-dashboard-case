@@ -105,6 +105,32 @@ export function calculateModel(data, filters = {}) {
   return { profitAndLoss, cashFlow, balanceSheet, recognizedRevenue: profitAndLoss.revenue, deferredRevenue: balanceSheet.deferredRevenue, periodResults: [] };
 }
 
+export function calculateManagementView(data, filters = {}, { mode = 'Факт', scenario = 'base' } = {}) {
+  if (mode === 'Факт') return calculateModel(data, filters);
+  const sourceKey = mode === 'План' ? 'plan' : 'forecast';
+  const months = data.drivers.months.filter((month) => !filters.periodIds || filters.periodIds.includes(month.periodId));
+  const selected = months.length ? months : data.drivers.months;
+  const rows = selected.map((month) => {
+    const source = sourceKey === 'plan' ? month.plan : scenarioDrivers(month.forecast, scenario);
+    const revenue = source.leads * source.conversion / 100 * source.averageCheck * (1 - source.refunds);
+    return { revenue, costOfSales: source.directCosts, marketing: source.marketing, sales: 0, payroll: source.payroll, admin: source.admin };
+  });
+  const sum = (key) => rows.reduce((total, row) => total + row[key], 0);
+  const revenue = sum('revenue');
+  const costOfSales = sum('costOfSales');
+  const marketing = sum('marketing');
+  const sales = sum('sales');
+  const payroll = sum('payroll');
+  const admin = sum('admin');
+  const grossProfit = revenue - costOfSales;
+  const ebitda = grossProfit - marketing - sales - payroll - admin;
+  const netCashFlow = ebitda;
+  const profitAndLoss = { revenue, costOfSales, grossProfit, marketing, sales, payroll, admin, ebitda, depreciation: 0, ebit: ebitda, interest: 0, taxes: 0, netProfit: ebitda };
+  const cashFlow = { openingCash: data.openingBalances.cash, operating: netCashFlow, investing: 0, financing: 0, netCashFlow, closingCash: data.openingBalances.cash + netCashFlow };
+  const balanceSheet = { cash: null, receivables: null, otherAssets: null, fixedAssets: null, totalAssets: null, payables: null, deferredRevenue: null, otherLiabilities: null, equity: null, totalLiabilitiesAndEquity: null, balanceCheck: null };
+  return { profitAndLoss, cashFlow, balanceSheet, recognizedRevenue: revenue, deferredRevenue: null, periodResults: [] };
+}
+
 function scenarioDrivers(drivers, scenario, customDrivers = {}) {
   const factor = scenario === 'optimistic' ? { leads: 1.08, conversion: 1.08, averageCheck: 1.03 } : scenario === 'conservative' ? { leads: 0.92, conversion: 0.94, averageCheck: 0.98 } : { leads: 1, conversion: 1, averageCheck: 1 };
   const source = scenario === 'custom' ? { ...drivers, ...customDrivers } : drivers;
@@ -126,3 +152,4 @@ export function calculateRollingForecast(data, { lastClosedPeriodId = '2026-09',
   const revenue = sum('revenue');
   return { months, annual: { revenue, ebitda: sum('ebitda'), cashFlow: sum('cashFlow') }, shortfallPercent: budget === 0 ? 0 : Math.max(0, (budget - revenue) / budget * 100) };
 }
+
