@@ -3,6 +3,12 @@ const periodMap = {
   '3 квартал 2026': ['2026-07', '2026-08', '2026-09']
 };
 
+const comparisonMap = {
+  'Предыдущий период': ['2026-08'],
+  '3 квартал 2025': ['2025-07', '2025-08', '2025-09'],
+  '2025 YTD': Array.from({ length: 12 }, (_, index) => `2025-${String(index + 1).padStart(2, '0')}`)
+};
+
 const segmentIds = {
   'Основные курсы': 'core',
   'Премиум-программы': 'premium',
@@ -36,6 +42,7 @@ export function readFilterState(elements = {}, data = { periods: [] }) {
     unit: elements.unit?.value || 'Все подразделения',
     productId: elements.product?.value && elements.product.value !== 'all' ? elements.product.value : undefined,
     comparisonPeriod,
+    comparisonPeriodIds: comparisonMap[comparisonPeriod] || [],
     viewMode
   };
 }
