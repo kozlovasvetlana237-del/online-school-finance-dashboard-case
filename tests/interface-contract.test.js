@@ -17,6 +17,6 @@ test('index exposes every required dashboard tab and module entrypoint', () => {
   }
   assert.match(ui, /Демонстрационная финансовая модель/);
   assert.match(html, /<script\s+type=["']module["']\s+src=["']\.\/js\/ui\.js\?v=[^"']+["']/);
-  assert.match(ui, /from ['"]\.\/ui-state\.js['"]/);
+  assert.match(ui, /from ['"]\.\/ui-state\.js\?v=[^'"]+['"]/);
 });
 
