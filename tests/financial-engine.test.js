@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { demoData } from '../data/demo-data.js';
-import { calculateModel, calculateProfitAndLoss, calculateCashFlow, calculateRollingForecast } from '../js/financial-engine.js';
+import { calculateManagementView, calculateModel, calculateProfitAndLoss, calculateCashFlow, calculateRollingForecast } from '../js/financial-engine.js';
 import { calculateBudgetVariance, calculateControlChecks, calculateAnnualForecast, formatRelativeVariance, calculateRevenueBridge, calculateEbitdaBridge, buildFinancialSignals, calculateUnitEconomics, calculateCohortMatrix, calculateLiquidityCalendar, calculateBudgetControl, loadBudgetControlState, saveBudgetControlState, resetBudgetControlState } from '../js/analytics.js';
 
 test('financial model has no invalid numbers', () => {
@@ -23,6 +23,19 @@ test('gross profit and EBITDA reconcile to P&L', () => {
   const pl = calculateProfitAndLoss(demoData, { periodIds: ['2026-09'] });
   assert.equal(pl.grossProfit, pl.revenue - pl.costOfSales);
   assert.equal(pl.ebitda, pl.grossProfit - pl.marketing - pl.sales - pl.payroll - pl.admin);
+});
+
+test('management view uses plan drivers and does not invent a plan balance', () => {
+  const plan = calculateManagementView(demoData, { periodIds: ['2026-09'] }, { mode: 'План' });
+  assert.ok(plan.profitAndLoss.revenue > 0);
+  assert.equal(plan.profitAndLoss.grossProfit, plan.profitAndLoss.revenue - plan.profitAndLoss.costOfSales);
+  assert.equal(plan.balanceSheet.balanceCheck, null);
+});
+
+test('comparison period is independent from current fact model', () => {
+  const current = calculateModel(demoData, { periodIds: ['2026-09'] });
+  const comparison = calculateModel(demoData, { periodIds: ['2026-08'] });
+  assert.notEqual(current.profitAndLoss.revenue, comparison.profitAndLoss.revenue);
 });
 
 test('budget variance handles zero plan without infinity', () => {
@@ -181,3 +194,4 @@ test('budget control state saves and resets locally', () => {
   resetBudgetControlState(storage, 'test');
   assert.deepEqual(loadBudgetControlState(storage, 'test'), {});
 });
+
