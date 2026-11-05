@@ -20,7 +20,7 @@ body[data-theme="light"]{
 html,body{margin:0;padding:0}
 body{
   font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);
-  transition:background .2s ease,color .2s ease;
+  transition:background .2s ease,color .2s ease;overflow-x:hidden;
 }
 button,select{font:inherit}
 button{cursor:pointer}
@@ -33,10 +33,11 @@ button{cursor:pointer}
 }
 body[data-theme="light"] .header{background:rgba(245,247,251,.94)}
 .wrap{max-width:1440px;margin:0 auto;padding:18px 22px}
-.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.brand{min-width:0;flex:1 1 360px}
 .brand h1{margin:0;font-size:28px;line-height:1.1}
 .brand small{display:block;margin-top:6px;color:var(--muted);font-size:13px;line-height:1.45}
-.right-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.right-tools{display:flex;align-items:center;gap:10px;flex:1 1 720px;min-width:0;flex-wrap:wrap;justify-content:flex-end}
 .filters{display:flex;gap:10px;flex-wrap:wrap}
 select,.theme-toggle{
   background:var(--panel);color:var(--text);border:1px solid var(--line);
@@ -70,8 +71,8 @@ body[data-theme="light"] .demo-badge{
 .case-box h2{margin:0 0 8px;font-size:20px}
 .case-box p{margin:0;color:var(--muted);line-height:1.55}
 .grid{display:grid;gap:14px}
-.kpis{grid-template-columns:repeat(8,minmax(150px,1fr));margin-top:14px}
-.kpis-4{grid-template-columns:repeat(4,minmax(180px,1fr))}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:14px}
+.kpis-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 .row2{grid-template-columns:1fr 1fr;margin-top:14px}
 .row3{grid-template-columns:1.15fr .85fr .85fr;margin-top:14px}
 .card{
