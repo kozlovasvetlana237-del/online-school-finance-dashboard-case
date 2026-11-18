@@ -19,5 +19,7 @@ test('index exposes every required dashboard tab and module entrypoint', () => {
   assert.match(html, /<script\s+type=["']module["']\s+src=["']\.\/js\/ui\.js\?v=[^"']+["']/);
   assert.match(ui, /from ['"]\.\/ui-state\.js\?v=[^'"]+['"]/);
   assert.match(ui, /getElementById\(['"]revenueChart['"]\)/);
+  assert.match(html, /\.waterfall\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)/);
+  assert.match(ui, /getElementById\(['"]varianceWaterfall['"]\)/);
 });
 
