@@ -17,6 +17,11 @@ function percent(value, digits = 1) {
   return `${value.toFixed(digits).replace('.', ',')}%`;
 }
 
+function thousands(value, digits = 2) {
+  if (!Number.isFinite(value)) return 'н/д';
+  return `${(value / 1000).toFixed(digits).replace('.', ',')} тыс. ₽`;
+}
+
 function bind(key, value) {
   document.querySelectorAll(`[data-bind="${key}"]`).forEach((node) => { node.textContent = value; });
 }
@@ -119,6 +124,9 @@ export function renderDashboard(model, state = selectedFilters()) {
   const ebitdaBridge = calculateEbitdaBridge(toPl(driverMonth.plan), toPl(driverMonth.actual));
   const forecast = calculateRollingForecast(demoData, { lastClosedPeriodId: '2026-09', scenario: state.scenario, customDrivers });
   const signals = buildFinancialSignals({ planFact: { marketing: calculateBudgetVariance(driverMonth.plan.marketing, driverMonth.actual.marketing, 'expense') }, forecast, model, thresholds: demoData.drivers.thresholds });
+  const selectedDrivers = state.viewMode === 'План' ? driverMonth.plan : state.viewMode === 'Прогноз' ? driverMonth.forecast : driverMonth.actual;
+  const annualPlan = forecast.months.reduce((sum, month) => sum + month.budgetRevenue, 0);
+  const planDelta = forecast.annual.revenue - annualPlan;
 
   bind('rev', money(pl.revenue));
   bind('ebitda', money(pl.ebitda));
@@ -128,6 +136,8 @@ export function renderDashboard(model, state = selectedFilters()) {
   bind('budgetExecDelta', budget.relative === null ? 'н/д' : `${budget.absolute >= 0 ? '+' : ''}${money(budget.absolute)}`);
   bind('revenueTrend', revenueTrend === null ? 'н/д к сравнению' : `${revenueTrend >= 0 ? '+' : ''}${percent(revenueTrend)} к сравнению`);
   bind('yearForecast', money(pl.revenue));
+  bind('avgCheck', thousands(selectedDrivers.averageCheck));
+  bind('conversion', percent(selectedDrivers.conversion));
   bind('freeCash', money(cf.closingCash));
   const unitMetrics = calculateUnitEconomics(demoData, { productId: state.productId === 'all' ? undefined : state.productId });
   const totalRevenue = unitMetrics.reduce((sum, item) => sum + item.revenue, 0);
@@ -140,6 +150,9 @@ export function renderDashboard(model, state = selectedFilters()) {
   bind('actualRevenue', money(pl.revenue));
   bind('budgetRevenue', money(budgetPlan));
   bind('budgetVariance', budget.relative === null ? 'н/д' : `${budget.absolute >= 0 ? '+' : '−'}${money(Math.abs(budget.absolute))}`);
+  bind('planYear', money(annualPlan));
+  bind('toPlan', `${planDelta >= 0 ? '+' : '−'}${money(Math.abs(planDelta))}`);
+  bind('planProbability', percent(Math.max(0, 100 - forecast.shortfallPercent), 0));
   bind('overviewScope', `${state.period} · ${state.viewMode.toLowerCase()} · сравнение: ${state.comparisonPeriod}`);
 
   renderTable('plBody', [
